@@ -36,7 +36,7 @@ const menu: MenuSection[] = [
   {
     title: "Операционка",
     items: [
-      { href: "/orders", label: "Заказы", icon: ShoppingCart },
+      { href: "/order", label: "Заказы", icon: ShoppingCart },
       { href: "/managers", label: "Менеджеры", icon: UserCog },
       { href: "/salary", label: "Зарплата", icon: Wallet },
     ],
