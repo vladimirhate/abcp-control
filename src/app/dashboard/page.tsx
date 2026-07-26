@@ -19,6 +19,15 @@ type Manager = {
   email: string;
 };
 
+type ManagerStats = {
+  id: string;
+  name: string;
+  ordersCount: number;
+  revenue: number;
+  paidCount: number;
+  avgCheck: number;
+};
+
 async function getOrders(): Promise<Order[]> {
   const dateStart = new Date();
   dateStart.setDate(dateStart.getDate() - 30);
@@ -41,11 +50,45 @@ async function getManagers(): Promise<Manager[]> {
 }
 
 function getManagerName(managerId: string, managers: Manager[]): string {
-  if (!managerId || managerId === "0") return "—";
+  if (!managerId || managerId === "0") return "Без менеджера";
   const manager = managers.find((m) => m.id === managerId);
   if (!manager) return "ID: " + managerId;
   const fullName = (manager.firstName + " " + manager.lastName).trim();
   return fullName || manager.email || "ID: " + managerId;
+}
+
+function calcManagerStats(orders: Order[], managers: Manager[]): ManagerStats[] {
+  const statsMap = new Map<string, ManagerStats>();
+
+  for (const order of orders) {
+    const id = order.managerId || "0";
+    const existing = statsMap.get(id);
+
+    if (existing) {
+      existing.ordersCount += 1;
+      existing.revenue += Number(order.sum || 0);
+      if (order.paid) existing.paidCount += 1;
+    } else {
+      statsMap.set(id, {
+        id,
+        name: getManagerName(id, managers),
+        ordersCount: 1,
+        revenue: Number(order.sum || 0),
+        paidCount: order.paid ? 1 : 0,
+        avgCheck: 0,
+      });
+    }
+  }
+
+  const stats = Array.from(statsMap.values());
+
+  for (const s of stats) {
+    s.avgCheck = s.ordersCount > 0 ? s.revenue / s.ordersCount : 0;
+  }
+
+  stats.sort((a, b) => b.revenue - a.revenue);
+
+  return stats;
 }
 
 export default async function DashboardPage() {
@@ -71,6 +114,8 @@ export default async function DashboardPage() {
   const ordersWithoutManager = orders.filter(
     (o) => !o.managerId || o.managerId === "0"
   ).length;
+
+  const managerStats = calcManagerStats(orders, managers);
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -130,6 +175,53 @@ export default async function DashboardPage() {
                 </div>
               </div>
             )}
+
+            <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
+              <div className="border-b border-slate-800 px-6 py-4">
+                <h2 className="font-semibold">Статистика по менеджерам</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-left text-slate-400">
+                      <th className="px-4 py-3 font-medium">Менеджер</th>
+                      <th className="px-4 py-3 font-medium">Заказов</th>
+                      <th className="px-4 py-3 font-medium">Выручка</th>
+                      <th className="px-4 py-3 font-medium">Оплачено</th>
+                      <th className="px-4 py-3 font-medium">Средний чек</th>
+                      <th className="px-4 py-3 font-medium">Доля выручки</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {managerStats.map((m) => {
+                      const share = totalRevenue > 0 ? (m.revenue / totalRevenue) * 100 : 0;
+                      return (
+                        <tr key={m.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                          <td className="px-4 py-3 font-medium">
+                            {m.id === "0" ? (
+                              <span className="text-amber-400">{m.name}</span>
+                            ) : (
+                              <span className="text-white">{m.name}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-300">{m.ordersCount}</td>
+                          <td className="px-4 py-3 text-slate-300">
+                            {m.revenue.toLocaleString("ru-RU")} ₽
+                          </td>
+                          <td className="px-4 py-3 text-slate-300">{m.paidCount}</td>
+                          <td className="px-4 py-3 text-slate-300">
+                            {Math.round(m.avgCheck).toLocaleString("ru-RU")} ₽
+                          </td>
+                          <td className="px-4 py-3 text-slate-300">
+                            {share.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-6 py-4">
