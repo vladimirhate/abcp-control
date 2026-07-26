@@ -9,6 +9,7 @@ type Order = {
   date: string;
   dateUpdated: string;
   positionsQuantity: number;
+  managerId: string;
 };
 
 async function getOrders(): Promise<Order[]> {
@@ -104,7 +105,7 @@ export default async function DashboardPage() {
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-6 py-4">
-                <h2 className="font-semibold">Последние заказы</h2>
+                <h2 className="font-semibold">Заказы за 30 дней</h2>
               </div>
 
               <div className="overflow-x-auto">
@@ -113,6 +114,7 @@ export default async function DashboardPage() {
                     <tr className="border-b border-slate-800 text-left text-slate-400">
                       <th className="px-4 py-3 font-medium">№ заказа</th>
                       <th className="px-4 py-3 font-medium">Клиент</th>
+                      <th className="px-4 py-3 font-medium">Менеджер</th>
                       <th className="px-4 py-3 font-medium">Сумма</th>
                       <th className="px-4 py-3 font-medium">Позиций</th>
                       <th className="px-4 py-3 font-medium">Оплачен</th>
@@ -130,6 +132,9 @@ export default async function DashboardPage() {
                         </td>
                         <td className="px-4 py-3 text-slate-300">
                           {order.userName || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {order.managerId || "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-300">
                           {Number(order.sum || 0).toLocaleString("ru-RU")} ₽
