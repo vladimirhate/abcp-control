@@ -7,6 +7,7 @@ import {
   calcOrderMargin,
   OrderPosition,
 } from "@/lib/abcp";
+import { getShop } from "@/lib/shop";
 
 type Order = {
   number: string;
@@ -67,17 +68,39 @@ function getPeriodRange(period: Period): { dateStart: Date; dateEnd: Date } {
 async function getOrders(period: Period): Promise<Order[]> {
   const { dateStart, dateEnd } = getPeriodRange(period);
 
-  const data = await abcpRequest<Order[]>("cp/orders", {
-    dateCreatedStart: formatDate(dateStart),
-    dateCreatedEnd: formatDate(dateEnd),
-    limit: "1000",
-  });
+  const shop = await getShop();
+  if (!shop) throw new Error("Магазин не найден в БД");
+
+  const data = await abcpRequest<Order[]>(
+    "cp/orders",
+    {
+      dateCreatedStart: formatDate(dateStart),
+      dateCreatedEnd: formatDate(dateEnd),
+      limit: "1000",
+    },
+    {
+      api_url: shop.api_url,
+      api_login: shop.api_login,
+      api_password_md5: shop.api_password_md5,
+    }
+  );
 
   return data;
 }
 
 async function getManagers(): Promise<Manager[]> {
-  return abcpRequest<Manager[]>("cp/managers");
+  const shop = await getShop();
+  if (!shop) throw new Error("Магазин не найден в БД");
+
+  return abcpRequest<Manager[]>(
+    "cp/managers",
+    {},
+    {
+      api_url: shop.api_url,
+      api_login: shop.api_login,
+      api_password_md5: shop.api_password_md5,
+    }
+  );
 }
 
 function getManagerName(managerId: string, managers: Manager[]): string {

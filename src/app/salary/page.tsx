@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { abcpRequest, formatDate, calcOrderMargin, OrderPosition } from "@/lib/abcp";
-import { calculateSalary, DEFAULT_RULES, SalaryCalculation } from "@/lib/salary";
+import { calculateSalary, SalaryCalculation, SalaryRules } from "@/lib/salary";
+import { getShop, getSalaryRule } from "@/lib/shop";
 
 type Order = {
   number: string;
@@ -25,15 +26,37 @@ async function getOrders(): Promise<Order[]> {
   const dateEnd = new Date();
   dateEnd.setHours(23, 59, 59, 0);
 
-  return abcpRequest<Order[]>("cp/orders", {
-    dateCreatedStart: formatDate(dateStart),
-    dateCreatedEnd: formatDate(dateEnd),
-    limit: "1000",
-  });
+  const shop = await getShop();
+  if (!shop) throw new Error("Магазин не найден в БД");
+
+  return abcpRequest<Order[]>(
+    "cp/orders",
+    {
+      dateCreatedStart: formatDate(dateStart),
+      dateCreatedEnd: formatDate(dateEnd),
+      limit: "1000",
+    },
+    {
+      api_url: shop.api_url,
+      api_login: shop.api_login,
+      api_password_md5: shop.api_password_md5,
+    }
+  );
 }
 
 async function getManagers(): Promise<Manager[]> {
-  return abcpRequest<Manager[]>("cp/managers");
+  const shop = await getShop();
+  if (!shop) throw new Error("Магазин не найден в БД");
+
+  return abcpRequest<Manager[]>(
+    "cp/managers",
+    {},
+    {
+      api_url: shop.api_url,
+      api_login: shop.api_login,
+      api_password_md5: shop.api_password_md5,
+    }
+  );
 }
 
 function getManagerName(managerId: string, managers: Manager[]): string {
@@ -47,14 +70,38 @@ function getManagerName(managerId: string, managers: Manager[]): string {
 export default async function SalaryPage() {
   let orders: Order[] = [];
   let managers: Manager[] = [];
+  let salaryRule: SalaryRules | null = null;
   let error: string | null = null;
 
   try {
-    const results = await Promise.all([getOrders(), getManagers()]);
+    const results = await Promise.all([getOrders(), getManagers(), getSalaryRule()]);
     orders = results[0];
     managers = results[1];
+    const rule = results[2];
+
+    if (rule) {
+      salaryRule = {
+        baseSalary: Number(rule.base_salary),
+        revenuePercent: Number(rule.revenue_percent),
+        marginPercent: Number(rule.margin_percent),
+        paidRevenuePercent: Number(rule.paid_revenue_percent),
+        planThreshold: Number(rule.plan_threshold),
+        planBonus: Number(rule.plan_bonus),
+      };
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
+  }
+
+  if (!salaryRule) {
+    salaryRule = {
+      baseSalary: 30000,
+      revenuePercent: 1,
+      marginPercent: 20,
+      paidRevenuePercent: 2,
+      planThreshold: 500000,
+      planBonus: 5000,
+    };
   }
 
   const managerData = new Map<
@@ -88,7 +135,7 @@ export default async function SalaryPage() {
 
   const calculations: SalaryCalculation[] = [];
 
-  for (const [managerId, data] of managerData) {
+    for (const [managerId, data] of managerData) {
     const managerName = getManagerName(managerId, managers);
     const calc = calculateSalary(
       managerId,
@@ -97,7 +144,7 @@ export default async function SalaryPage() {
       data.revenue,
       data.margin,
       data.paidRevenue,
-      DEFAULT_RULES
+      salaryRule
     );
     calculations.push(calc);
   }
@@ -175,40 +222,40 @@ export default async function SalaryPage() {
             </div>
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900 p-5">
-              <h2 className="font-semibold">Текущая формула ЗП</h2>
-              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-                <div>
-                  <div className="text-slate-400">Оклад</div>
-                  <div className="font-medium">
-                    {DEFAULT_RULES.baseSalary.toLocaleString("ru-RU")} ₽
-                  </div>
-                </div>
-                <div>
-                  <div className="text-slate-400">% от выручки</div>
-                  <div className="font-medium">{DEFAULT_RULES.revenuePercent}%</div>
-                </div>
-                <div>
-                  <div className="text-slate-400">% от маржи</div>
-                  <div className="font-medium text-green-400">
-                    {DEFAULT_RULES.marginPercent}%
-                  </div>
-                </div>
-                <div>
-                  <div className="text-slate-400">% за оплаченное</div>
-                  <div className="font-medium">
-                    {DEFAULT_RULES.paidRevenuePercent}%
-                  </div>
-                </div>
-                <div>
-                  <div className="text-slate-400">
-                    Бонус за {DEFAULT_RULES.planThreshold.toLocaleString("ru-RU")} ₽
-                  </div>
-                  <div className="font-medium">
-                    {DEFAULT_RULES.planBonus.toLocaleString("ru-RU")} ₽
-                  </div>
-                </div>
-              </div>
-            </div>
+  <h2 className="font-semibold">Текущая формула ЗП</h2>
+  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+    <div>
+      <div className="text-slate-400">Оклад</div>
+      <div className="font-medium">
+        {salaryRule.baseSalary.toLocaleString("ru-RU")} ₽
+      </div>
+    </div>
+    <div>
+      <div className="text-slate-400">% от выручки</div>
+      <div className="font-medium">{salaryRule.revenuePercent}%</div>
+    </div>
+    <div>
+      <div className="text-slate-400">% от маржи</div>
+      <div className="font-medium text-green-400">
+        {salaryRule.marginPercent}%
+      </div>
+    </div>
+    <div>
+      <div className="text-slate-400">% за оплаченное</div>
+      <div className="font-medium">
+        {salaryRule.paidRevenuePercent}%
+      </div>
+    </div>
+    <div>
+      <div className="text-slate-400">
+        Бонус за {salaryRule.planThreshold.toLocaleString("ru-RU")} ₽
+      </div>
+      <div className="font-medium">
+        {salaryRule.planBonus.toLocaleString("ru-RU")} ₽
+      </div>
+    </div>
+  </div>
+</div>
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-6 py-4">

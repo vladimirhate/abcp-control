@@ -38,17 +38,26 @@ export function formatDate(date: Date): string {
   return `${y}-${m}-${d} ${h}:${min}:${s}`;
 }
 
+type ShopCredentials = {
+  api_url: string;
+  api_login: string;
+  api_password_md5: string;
+};
+
 export async function abcpRequest<T>(
   endpoint: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
+  credentials?: ShopCredentials
 ): Promise<T> {
-  const siteUrl = process.env.ABCP_SITE_URL;
-  const login = process.env.ABCP_LOGIN;
-  const password = process.env.ABCP_PASSWORD;
+  // Если credentials переданы — используем их (из БД)
+  // Иначе — fallback на переменные окружения (для тестов)
+  const siteUrl = credentials?.api_url || process.env.ABCP_SITE_URL;
+  const login = credentials?.api_login || process.env.ABCP_LOGIN;
+  const password = credentials?.api_password_md5 || process.env.ABCP_PASSWORD;
 
   if (!siteUrl || !login || !password) {
     throw new Error(
-      "Не заполнены переменные ABCP_SITE_URL, ABCP_LOGIN, ABCP_PASSWORD"
+      "Не заданы данные для подключения к API ABCP"
     );
   }
 
