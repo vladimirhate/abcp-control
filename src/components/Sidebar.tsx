@@ -52,13 +52,13 @@ const menu: MenuSection[] = [
     ],
   },
   {
-    title: "Сервис",
-    items: [
-      { href: "/alerts", label: "Алерты", icon: Bell },
-      { href: "/settings", label: "Мой магазин", icon: Store },
-      { href: "/settings/salary", label: "Правила ЗП", icon: Wallet },
-    ],
-  },
+  title: "Сервис",
+  items: [
+    { href: "/settings", label: "Мой магазин", icon: Store },
+    { href: "/settings/salary", label: "Правила ЗП", icon: Wallet },
+    { href: "/settings/alerts", label: "Алерты", icon: Bell },
+  ],
+},
 ];
 
 export function Sidebar() {
