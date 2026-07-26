@@ -1,3 +1,31 @@
+export type OrderPosition = {
+  id: string;
+  brand: string;
+  description: string;
+  quantity: string;
+  quantityFinal: string;
+  priceIn: number;
+  priceOut: number;
+  status: string;
+  statusCode: string;
+  isCanceled: string;
+};
+
+export function calcPositionMargin(pos: OrderPosition): number {
+  // Считаем маржу только по неотменённым позициям
+  if (pos.isCanceled === "1") return 0;
+
+  const qty = Number(pos.quantityFinal || pos.quantity || 0);
+  const priceIn = Number(pos.priceIn || 0);
+  const priceOut = Number(pos.priceOut || 0);
+
+  return (priceOut - priceIn) * qty;
+}
+
+export function calcOrderMargin(positions: OrderPosition[] | undefined): number {
+  if (!positions || positions.length === 0) return 0;
+  return positions.reduce((sum, pos) => sum + calcPositionMargin(pos), 0);
+}
 // Форматируем дату в формат ABCP: "2025-01-15 00:00:00"
 export function formatDate(date: Date): string {
   const y = date.getFullYear();
@@ -45,4 +73,25 @@ export async function abcpRequest<T>(
 
   const data = await response.json();
   return data as T;
+}
+// Сколько часов прошло с даты обновления
+export function hoursSince(dateStr: string): number {
+  if (!dateStr) return 0;
+
+  // Формат даты из API: "2026-07-15 13:16:29"
+  // Заменяем пробел на T для корректного парсинга
+  const isoDate = dateStr.replace(" ", "T");
+  const date = new Date(isoDate);
+
+  if (isNaN(date.getTime())) return 0;
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60));
+}
+
+// Проверяем, завис ли заказ
+export function isStuckOrder(dateUpdated: string, thresholdHours: number = 24): boolean {
+  const hours = hoursSince(dateUpdated);
+  return hours >= thresholdHours;
 }

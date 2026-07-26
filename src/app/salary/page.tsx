@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abcpRequest, formatDate } from "@/lib/abcp";
+import { abcpRequest, formatDate, calcOrderMargin, OrderPosition } from "@/lib/abcp";
 import { calculateSalary, DEFAULT_RULES, SalaryCalculation } from "@/lib/salary";
 
 type Order = {
@@ -7,6 +7,7 @@ type Order = {
   sum: number;
   paid: boolean;
   managerId: string;
+  positions?: OrderPosition[];
 };
 
 type Manager = {
@@ -58,25 +59,28 @@ export default async function SalaryPage() {
 
   const managerData = new Map<
     string,
-    { ordersCount: number; revenue: number; paidRevenue: number }
+    { ordersCount: number; revenue: number; margin: number; paidRevenue: number }
   >();
 
   for (const order of orders) {
     const id = order.managerId || "0";
     if (id === "0") continue;
 
-    const existing = managerData.get(id);
     const sum = Number(order.sum || 0);
+    const orderMargin = calcOrderMargin(order.positions);
     const paidSum = order.paid ? sum : 0;
 
+    const existing = managerData.get(id);
     if (existing) {
       existing.ordersCount += 1;
       existing.revenue += sum;
+      existing.margin += orderMargin;
       existing.paidRevenue += paidSum;
     } else {
       managerData.set(id, {
         ordersCount: 1,
         revenue: sum,
+        margin: orderMargin,
         paidRevenue: paidSum,
       });
     }
@@ -91,6 +95,7 @@ export default async function SalaryPage() {
       managerName,
       data.ordersCount,
       data.revenue,
+      data.margin,
       data.paidRevenue,
       DEFAULT_RULES
     );
@@ -101,6 +106,7 @@ export default async function SalaryPage() {
 
   const totalFot = calculations.reduce((sum, c) => sum + c.total, 0);
   const totalRevenue = calculations.reduce((sum, c) => sum + c.revenue, 0);
+  const totalMargin = calculations.reduce((sum, c) => sum + c.margin, 0);
 
   const now = new Date();
   const monthName = now.toLocaleDateString("ru-RU", {
@@ -119,6 +125,9 @@ export default async function SalaryPage() {
             <Link href="/dashboard" className="text-sm text-slate-400 hover:text-white">
               Дашборд
             </Link>
+            <Link href="/salary" className="text-sm text-slate-400 hover:text-white">
+              Зарплата
+            </Link>
             <Link href="/api-test" className="text-sm text-slate-400 hover:text-white">
               API test
             </Link>
@@ -129,9 +138,7 @@ export default async function SalaryPage() {
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div>
           <h1 className="text-2xl font-bold">Расчёт зарплаты</h1>
-          <p className="mt-2 text-slate-400">
-            Период: {monthName}
-          </p>
+          <p className="mt-2 text-slate-400">Период: {monthName}</p>
         </div>
 
         {error ? (
@@ -140,17 +147,23 @@ export default async function SalaryPage() {
           </div>
         ) : (
           <>
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div className="text-sm text-slate-400">Фонд оплаты труда</div>
+                <div className="text-sm text-slate-400">ФОТ</div>
                 <div className="mt-2 text-3xl font-bold">
-                  {totalFot.toLocaleString("ru-RU")} ₽
+                  {Math.round(totalFot).toLocaleString("ru-RU")} ₽
                 </div>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div className="text-sm text-slate-400">Общая выручка</div>
+                <div className="text-sm text-slate-400">Выручка</div>
                 <div className="mt-2 text-3xl font-bold">
                   {totalRevenue.toLocaleString("ru-RU")} ₽
+                </div>
+              </div>
+              <div className="rounded-xl border border-green-800/50 bg-green-900/10 p-5">
+                <div className="text-sm text-green-300/70">Маржа</div>
+                <div className="mt-2 text-3xl font-bold text-green-400">
+                  {Math.round(totalMargin).toLocaleString("ru-RU")} ₽
                 </div>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
@@ -163,22 +176,36 @@ export default async function SalaryPage() {
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900 p-5">
               <h2 className="font-semibold">Текущая формула ЗП</h2>
-              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
                 <div>
                   <div className="text-slate-400">Оклад</div>
-                  <div className="font-medium">{DEFAULT_RULES.baseSalary.toLocaleString("ru-RU")} ₽</div>
+                  <div className="font-medium">
+                    {DEFAULT_RULES.baseSalary.toLocaleString("ru-RU")} ₽
+                  </div>
                 </div>
                 <div>
                   <div className="text-slate-400">% от выручки</div>
                   <div className="font-medium">{DEFAULT_RULES.revenuePercent}%</div>
                 </div>
                 <div>
-                  <div className="text-slate-400">% от оплаченного</div>
-                  <div className="font-medium">{DEFAULT_RULES.paidRevenuePercent}%</div>
+                  <div className="text-slate-400">% от маржи</div>
+                  <div className="font-medium text-green-400">
+                    {DEFAULT_RULES.marginPercent}%
+                  </div>
                 </div>
                 <div>
-                  <div className="text-slate-400">Бонус за план ({DEFAULT_RULES.planThreshold.toLocaleString("ru-RU")} ₽)</div>
-                  <div className="font-medium">{DEFAULT_RULES.planBonus.toLocaleString("ru-RU")} ₽</div>
+                  <div className="text-slate-400">% за оплаченное</div>
+                  <div className="font-medium">
+                    {DEFAULT_RULES.paidRevenuePercent}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-400">
+                    Бонус за {DEFAULT_RULES.planThreshold.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <div className="font-medium">
+                    {DEFAULT_RULES.planBonus.toLocaleString("ru-RU")} ₽
+                  </div>
                 </div>
               </div>
             </div>
@@ -200,10 +227,12 @@ export default async function SalaryPage() {
                         <th className="px-4 py-3 font-medium">Менеджер</th>
                         <th className="px-4 py-3 font-medium">Заказов</th>
                         <th className="px-4 py-3 font-medium">Выручка</th>
+                        <th className="px-4 py-3 font-medium">Маржа</th>
                         <th className="px-4 py-3 font-medium">Оклад</th>
                         <th className="px-4 py-3 font-medium">% выручки</th>
-                        <th className="px-4 py-3 font-medium">% оплаченного</th>
-                        <th className="px-4 py-3 font-medium">Бонус план</th>
+                        <th className="px-4 py-3 font-medium">% маржи</th>
+                        <th className="px-4 py-3 font-medium">% оплач.</th>
+                        <th className="px-4 py-3 font-medium">План</th>
                         <th className="px-4 py-3 font-medium">Итого</th>
                       </tr>
                     </thead>
@@ -219,11 +248,17 @@ export default async function SalaryPage() {
                           <td className="px-4 py-3 text-slate-300">
                             {c.revenue.toLocaleString("ru-RU")} ₽
                           </td>
+                          <td className="px-4 py-3 text-green-400">
+                            {Math.round(c.margin).toLocaleString("ru-RU")} ₽
+                          </td>
                           <td className="px-4 py-3 text-slate-300">
                             {c.baseSalary.toLocaleString("ru-RU")} ₽
                           </td>
                           <td className="px-4 py-3 text-green-400">
                             +{Math.round(c.revenueBonus).toLocaleString("ru-RU")} ₽
+                          </td>
+                          <td className="px-4 py-3 text-green-400">
+                            +{Math.round(c.marginBonus).toLocaleString("ru-RU")} ₽
                           </td>
                           <td className="px-4 py-3 text-green-400">
                             +{Math.round(c.paidRevenueBonus).toLocaleString("ru-RU")} ₽
@@ -245,7 +280,7 @@ export default async function SalaryPage() {
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-slate-700">
-                        <td colSpan={7} className="px-4 py-4 font-semibold">
+                        <td colSpan={9} className="px-4 py-4 font-semibold">
                           ИТОГО ФОТ
                         </td>
                         <td className="px-4 py-4 text-lg font-bold text-blue-400">
