@@ -1,0 +1,9 @@
+{
+  "default": {
+    "baseSalary": 30000,
+    "revenuePercent": 3,
+    "paidRevenuePercent": 5,
+    "planThreshold": 500000,
+    "planBonus": 5000
+  }
+}

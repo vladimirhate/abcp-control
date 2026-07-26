@@ -156,15 +156,23 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <nav className="border-b border-slate-800 bg-slate-900">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-blue-400">
-            ABCP Dashboard
-          </Link>
-          <Link href="/api-test" className="text-sm text-slate-400 hover:text-white">
-            API test
-          </Link>
-        </div>
-      </nav>
+  <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <Link href="/" className="text-lg font-bold text-blue-400">
+      ABCP Dashboard
+    </Link>
+    <div className="flex gap-4">
+      <Link href="/dashboard" className="text-sm text-slate-400 hover:text-white">
+        Дашборд
+      </Link>
+      <Link href="/salary" className="text-sm text-slate-400 hover:text-white">
+        Зарплата
+      </Link>
+      <Link href="/api-test" className="text-sm text-slate-400 hover:text-white">
+        API test
+      </Link>
+    </div>
+  </div>
+</nav>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
