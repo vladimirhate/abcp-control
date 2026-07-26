@@ -2,6 +2,7 @@ import Link from "next/link";
 import { abcpRequest, formatDate, calcOrderMargin, OrderPosition } from "@/lib/abcp";
 import { calculateSalary, SalaryCalculation, SalaryRules } from "@/lib/salary";
 import { getShop, getSalaryRule } from "@/lib/shop";
+import { AppLayout } from "@/components/AppLayout";
 
 type Order = {
   number: string;
@@ -135,7 +136,7 @@ export default async function SalaryPage() {
 
   const calculations: SalaryCalculation[] = [];
 
-    for (const [managerId, data] of managerData) {
+  for (const [managerId, data] of managerData) {
     const managerName = getManagerName(managerId, managers);
     const calc = calculateSalary(
       managerId,
@@ -162,115 +163,96 @@ export default async function SalaryPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <nav className="border-b border-slate-800 bg-slate-900">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-blue-400">
-            ABCP Dashboard
-          </Link>
-          <div className="flex gap-4">
-            <Link href="/dashboard" className="text-sm text-slate-400 hover:text-white">
-              Дашборд
-            </Link>
-            <Link href="/salary" className="text-sm text-slate-400 hover:text-white">
-              Зарплата
-            </Link>
-            <Link href="/api-test" className="text-sm text-slate-400 hover:text-white">
-              API test
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <div className="mx-auto max-w-6xl px-6 py-8">
+    <AppLayout>
+      <div className="mx-auto max-w-7xl">
         <div>
-          <h1 className="text-2xl font-bold">Расчёт зарплаты</h1>
-          <p className="mt-2 text-slate-400">Период: {monthName}</p>
+          <h1 className="text-2xl font-bold text-slate-900">Расчёт зарплаты</h1>
+          <p className="mt-1 text-sm text-slate-500">Период: {monthName}</p>
         </div>
 
         {error ? (
-          <div className="mt-6 rounded-xl border border-red-800 bg-red-900/20 p-4 text-red-300">
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             Ошибка: {error}
           </div>
         ) : (
           <>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div className="text-sm text-slate-400">ФОТ</div>
-                <div className="mt-2 text-3xl font-bold">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-slate-500">ФОТ</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
                   {Math.round(totalFot).toLocaleString("ru-RU")} ₽
                 </div>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div className="text-sm text-slate-400">Выручка</div>
-                <div className="mt-2 text-3xl font-bold">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-slate-500">Выручка</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
                   {totalRevenue.toLocaleString("ru-RU")} ₽
                 </div>
               </div>
-              <div className="rounded-xl border border-green-800/50 bg-green-900/10 p-5">
-                <div className="text-sm text-green-300/70">Маржа</div>
-                <div className="mt-2 text-3xl font-bold text-green-400">
+              <div className="rounded-xl border border-green-200 bg-green-50 p-5 shadow-sm">
+                <div className="text-sm text-green-700">Маржа</div>
+                <div className="mt-2 text-3xl font-bold text-green-700">
                   {Math.round(totalMargin).toLocaleString("ru-RU")} ₽
                 </div>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div className="text-sm text-slate-400">Менеджеров</div>
-                <div className="mt-2 text-3xl font-bold">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-slate-500">Менеджеров</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
                   {calculations.length}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900 p-5">
-  <h2 className="font-semibold">Текущая формула ЗП</h2>
-  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-    <div>
-      <div className="text-slate-400">Оклад</div>
-      <div className="font-medium">
-        {salaryRule.baseSalary.toLocaleString("ru-RU")} ₽
-      </div>
-    </div>
-    <div>
-      <div className="text-slate-400">% от выручки</div>
-      <div className="font-medium">{salaryRule.revenuePercent}%</div>
-    </div>
-    <div>
-      <div className="text-slate-400">% от маржи</div>
-      <div className="font-medium text-green-400">
-        {salaryRule.marginPercent}%
-      </div>
-    </div>
-    <div>
-      <div className="text-slate-400">% за оплаченное</div>
-      <div className="font-medium">
-        {salaryRule.paidRevenuePercent}%
-      </div>
-    </div>
-    <div>
-      <div className="text-slate-400">
-        Бонус за {salaryRule.planThreshold.toLocaleString("ru-RU")} ₽
-      </div>
-      <div className="font-medium">
-        {salaryRule.planBonus.toLocaleString("ru-RU")} ₽
-      </div>
-    </div>
-  </div>
-</div>
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="font-semibold text-slate-900">Текущая формула ЗП</h2>
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                <div>
+                  <div className="text-slate-500">Оклад</div>
+                  <div className="mt-1 font-medium text-slate-900">
+                    {salaryRule.baseSalary.toLocaleString("ru-RU")} ₽
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-500">% от выручки</div>
+                  <div className="mt-1 font-medium text-slate-900">{salaryRule.revenuePercent}%</div>
+                </div>
+                <div>
+                  <div className="text-slate-500">% от маржи</div>
+                  <div className="mt-1 font-medium text-green-700">
+                    {salaryRule.marginPercent}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-500">% за оплаченное</div>
+                  <div className="mt-1 font-medium text-slate-900">
+                    {salaryRule.paidRevenuePercent}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-500">
+                    Бонус за {salaryRule.planThreshold.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <div className="mt-1 font-medium text-slate-900">
+                    {salaryRule.planBonus.toLocaleString("ru-RU")} ₽
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
-              <div className="border-b border-slate-800 px-6 py-4">
-                <h2 className="font-semibold">Расчёт по менеджерам</h2>
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h2 className="font-semibold text-slate-900">Расчёт по менеджерам</h2>
               </div>
 
               {calculations.length === 0 ? (
-                <div className="p-6 text-center text-slate-400">
+                <div className="p-6 text-center text-slate-500">
                   Нет данных для расчёта. У менеджеров нет заказов за этот месяц.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-800 text-left text-slate-400">
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
                         <th className="px-4 py-3 font-medium">Менеджер</th>
                         <th className="px-4 py-3 font-medium">Заказов</th>
                         <th className="px-4 py-3 font-medium">Выручка</th>
@@ -285,52 +267,52 @@ export default async function SalaryPage() {
                     </thead>
                     <tbody>
                       {calculations.map((c) => (
-                        <tr key={c.managerId} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                        <tr key={c.managerId} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="px-4 py-3 font-medium">
-                            <Link href={"/manager/" + c.managerId} className="text-white hover:text-blue-400">
+                            <Link href={"/manager/" + c.managerId} className="text-slate-900 hover:text-blue-600">
                               {c.managerName}
                             </Link>
                           </td>
-                          <td className="px-4 py-3 text-slate-300">{c.ordersCount}</td>
-                          <td className="px-4 py-3 text-slate-300">
+                          <td className="px-4 py-3 text-slate-700">{c.ordersCount}</td>
+                          <td className="px-4 py-3 text-slate-700">
                             {c.revenue.toLocaleString("ru-RU")} ₽
                           </td>
-                          <td className="px-4 py-3 text-green-400">
+                          <td className="px-4 py-3 font-medium text-green-700">
                             {Math.round(c.margin).toLocaleString("ru-RU")} ₽
                           </td>
-                          <td className="px-4 py-3 text-slate-300">
+                          <td className="px-4 py-3 text-slate-700">
                             {c.baseSalary.toLocaleString("ru-RU")} ₽
                           </td>
-                          <td className="px-4 py-3 text-green-400">
+                          <td className="px-4 py-3 text-green-700">
                             +{Math.round(c.revenueBonus).toLocaleString("ru-RU")} ₽
                           </td>
-                          <td className="px-4 py-3 text-green-400">
+                          <td className="px-4 py-3 text-green-700">
                             +{Math.round(c.marginBonus).toLocaleString("ru-RU")} ₽
                           </td>
-                          <td className="px-4 py-3 text-green-400">
+                          <td className="px-4 py-3 text-green-700">
                             +{Math.round(c.paidRevenueBonus).toLocaleString("ru-RU")} ₽
                           </td>
                           <td className="px-4 py-3">
                             {c.planCompleted ? (
-                              <span className="text-green-400">
+                              <span className="text-green-700 font-medium">
                                 +{c.planBonus.toLocaleString("ru-RU")} ₽
                               </span>
                             ) : (
-                              <span className="text-slate-600">—</span>
+                              <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-lg font-bold text-white">
+                          <td className="px-4 py-3 text-lg font-bold text-slate-900">
                             {Math.round(c.total).toLocaleString("ru-RU")} ₽
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-slate-700">
-                        <td colSpan={9} className="px-4 py-4 font-semibold">
+                      <tr className="border-t border-slate-200 bg-slate-50">
+                        <td colSpan={9} className="px-4 py-4 font-semibold text-slate-900">
                           ИТОГО ФОТ
                         </td>
-                        <td className="px-4 py-4 text-lg font-bold text-blue-400">
+                        <td className="px-4 py-4 text-xl font-bold text-blue-600">
                           {Math.round(totalFot).toLocaleString("ru-RU")} ₽
                         </td>
                       </tr>
@@ -342,6 +324,6 @@ export default async function SalaryPage() {
           </>
         )}
       </div>
-    </main>
+    </AppLayout>
   );
 }
