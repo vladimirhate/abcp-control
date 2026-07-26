@@ -28,13 +28,35 @@ type ManagerStats = {
   avgCheck: number;
 };
 
-async function getOrders(): Promise<Order[]> {
-  const dateStart = new Date();
-  dateStart.setDate(dateStart.getDate() - 30);
-  dateStart.setHours(0, 0, 0, 0);
+type Period = "today" | "week" | "month" | "quarter";
 
+const PERIODS: { key: Period; label: string; days: number }[] = [
+  { key: "today", label: "Сегодня", days: 0 },
+  { key: "week", label: "7 дней", days: 7 },
+  { key: "month", label: "30 дней", days: 30 },
+  { key: "quarter", label: "90 дней", days: 90 },
+];
+
+function getPeriodRange(period: Period): { dateStart: Date; dateEnd: Date } {
   const dateEnd = new Date();
   dateEnd.setHours(23, 59, 59, 0);
+
+  const dateStart = new Date();
+
+  if (period === "today") {
+    dateStart.setHours(0, 0, 0, 0);
+  } else {
+    const cfg = PERIODS.find((p) => p.key === period);
+    const days = cfg ? cfg.days : 30;
+    dateStart.setDate(dateStart.getDate() - days);
+    dateStart.setHours(0, 0, 0, 0);
+  }
+
+  return { dateStart, dateEnd };
+}
+
+async function getOrders(period: Period): Promise<Order[]> {
+  const { dateStart, dateEnd } = getPeriodRange(period);
 
   const data = await abcpRequest<Order[]>("cp/orders", {
     dateCreatedStart: formatDate(dateStart),
@@ -91,13 +113,27 @@ function calcManagerStats(orders: Order[], managers: Manager[]): ManagerStats[] 
   return stats;
 }
 
-export default async function DashboardPage() {
+type PageProps = {
+  searchParams: Promise<{ period?: string }>;
+};
+
+export default async function DashboardPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const periodParam = params?.period;
+  const period: Period =
+    periodParam === "today" ||
+    periodParam === "week" ||
+    periodParam === "month" ||
+    periodParam === "quarter"
+      ? periodParam
+      : "month";
+
   let orders: Order[] = [];
   let managers: Manager[] = [];
   let error: string | null = null;
 
   try {
-    const results = await Promise.all([getOrders(), getManagers()]);
+    const results = await Promise.all([getOrders(period), getManagers()]);
     orders = results[0];
     managers = results[1];
   } catch (e) {
@@ -131,10 +167,31 @@ export default async function DashboardPage() {
       </nav>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-2xl font-bold">Дашборд собственника</h1>
-        <p className="mt-2 text-slate-400">
-          Реальные данные из ABCP за последние 30 дней
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Дашборд собственника</h1>
+            <p className="mt-2 text-slate-400">
+              Реальные данные из ABCP
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            {PERIODS.map((p) => (
+              <Link
+                key={p.key}
+                href={"/dashboard?period=" + p.key}
+                className={
+                  "rounded-lg px-4 py-2 text-sm font-medium transition " +
+                  (period === p.key
+                    ? "bg-blue-600 text-white"
+                    : "border border-slate-700 text-slate-300 hover:bg-slate-800")
+                }
+              >
+                {p.label}
+              </Link>
+            ))}
+          </div>
+        </div>
 
         {error ? (
           <div className="mt-6 rounded-xl border border-red-800 bg-red-900/20 p-4 text-red-300">
@@ -225,7 +282,7 @@ export default async function DashboardPage() {
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-6 py-4">
-                <h2 className="font-semibold">Заказы за 30 дней</h2>
+                <h2 className="font-semibold">Заказы за период</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
