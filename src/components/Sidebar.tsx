@@ -8,12 +8,12 @@ import {
   ShoppingCart,
   Wallet,
   Truck,
-  Settings,
   UserCog,
   Tag,
   Package,
   Bell,
   TrendingUp,
+  Store,
 } from "lucide-react";
 
 type MenuItem = {
@@ -55,7 +55,8 @@ const menu: MenuSection[] = [
     title: "Сервис",
     items: [
       { href: "/alerts", label: "Алерты", icon: Bell },
-      { href: "/settings", label: "Настройки", icon: Settings },
+      { href: "/settings", label: "Мой магазин", icon: Store },
+      { href: "/settings/salary", label: "Правила ЗП", icon: Wallet },
     ],
   },
 ];
@@ -65,14 +66,12 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col bg-slate-900 text-slate-100">
-      {/* Логотип */}
       <div className="flex h-16 items-center border-b border-slate-800 px-6">
         <Link href="/dashboard" className="text-lg font-bold tracking-tight">
           ABCP<span className="text-blue-400">Control</span>
         </Link>
       </div>
 
-      {/* Меню */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {menu.map((section, i) => (
           <div key={i} className={i > 0 ? "mt-6" : ""}>
@@ -109,7 +108,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Футер */}
       <div className="border-t border-slate-800 px-6 py-4 text-xs text-slate-500">
         v0.1 · Beta
       </div>
