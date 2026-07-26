@@ -8,6 +8,7 @@ import {
   OrderPosition,
 } from "@/lib/abcp";
 import { getShop } from "@/lib/shop";
+import { AppLayout } from "@/components/AppLayout";
 
 type Order = {
   number: string;
@@ -38,6 +39,7 @@ type ManagerStats = {
   margin: number;
   marginPercent: number;
 };
+
 type Period = "today" | "week" | "month" | "quarter";
 
 const PERIODS: { key: Period; label: string; days: number }[] = [
@@ -184,7 +186,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   );
   const paidOrders = orders.filter((order) => order.paid).length;
   const avgCheck = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const totalMargin = orders.reduce(
+  const totalMargin = orders.reduce(
     (sum, order) => sum + calcOrderMargin(order.positions),
     0
   );
@@ -192,7 +194,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const ordersWithoutManager = orders.filter(
     (o) => !o.managerId || o.managerId === "0"
   ).length;
-    const STUCK_HOURS = 24;
+
+  const STUCK_HOURS = 24;
   const stuckOrders = orders
     .filter((o) => !o.paid && isStuckOrder(o.dateUpdated, STUCK_HOURS))
     .sort((a, b) => hoursSince(b.dateUpdated) - hoursSince(a.dateUpdated));
@@ -201,45 +204,27 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const managerStats = calcManagerStats(orders, managers);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <nav className="border-b border-slate-800 bg-slate-900">
-  <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-    <Link href="/" className="text-lg font-bold text-blue-400">
-      ABCP Dashboard
-    </Link>
-    <div className="flex gap-4">
-      <Link href="/dashboard" className="text-sm text-slate-400 hover:text-white">
-        Дашборд
-      </Link>
-      <Link href="/salary" className="text-sm text-slate-400 hover:text-white">
-        Зарплата
-      </Link>
-      <Link href="/api-test" className="text-sm text-slate-400 hover:text-white">
-        API test
-      </Link>
-    </div>
-  </div>
-</nav>
-
-      <div className="mx-auto max-w-6xl px-6 py-8">
+    <AppLayout>
+      <div className="mx-auto max-w-7xl">
+        {/* Заголовок */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Дашборд собственника</h1>
-            <p className="mt-2 text-slate-400">
+            <h1 className="text-2xl font-bold text-slate-900">Дашборд</h1>
+            <p className="mt-1 text-sm text-slate-500">
               Реальные данные из ABCP
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
             {PERIODS.map((p) => (
               <Link
                 key={p.key}
                 href={"/dashboard?period=" + p.key}
                 className={
-                  "rounded-lg px-4 py-2 text-sm font-medium transition " +
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition " +
                   (period === p.key
                     ? "bg-blue-600 text-white"
-                    : "border border-slate-700 text-slate-300 hover:bg-slate-800")
+                    : "text-slate-600 hover:bg-slate-100")
                 }
               >
                 {p.label}
@@ -249,184 +234,184 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </div>
 
         {error ? (
-          <div className="mt-6 rounded-xl border border-red-800 bg-red-900/20 p-4 text-red-300">
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             Ошибка: {error}
           </div>
         ) : (
           <>
+            {/* Метрики */}
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-  <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-    <div className="text-sm text-slate-400">Заказов</div>
-    <div className="mt-2 text-3xl font-bold">{totalOrders}</div>
-    <div className="mt-1 text-xs text-slate-500">
-      Оплачено: {paidOrders}
-    </div>
-  </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-slate-500">Заказов</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">{totalOrders}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Оплачено: {paidOrders}
+                </div>
+              </div>
 
-  <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-    <div className="text-sm text-slate-400">Выручка</div>
-    <div className="mt-2 text-3xl font-bold">
-      {totalRevenue.toLocaleString("ru-RU")} ₽
-    </div>
-    <div className="mt-1 text-xs text-slate-500">
-      Средний чек: {Math.round(avgCheck).toLocaleString("ru-RU")} ₽
-    </div>
-  </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-sm text-slate-500">Выручка</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
+                  {totalRevenue.toLocaleString("ru-RU")} ₽
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Средний чек: {Math.round(avgCheck).toLocaleString("ru-RU")} ₽
+                </div>
+              </div>
 
-  <div className="rounded-xl border border-green-800/50 bg-green-900/10 p-5">
-    <div className="text-sm text-green-300/70">Маржа</div>
-    <div className="mt-2 text-3xl font-bold text-green-400">
-      {Math.round(totalMargin).toLocaleString("ru-RU")} ₽
-    </div>
-    <div className="mt-1 text-xs text-green-300/70">
-      Маржинальность: {marginPercent.toFixed(1)}%
-    </div>
-  </div>
-</div>
+              <div className="rounded-xl border border-green-200 bg-green-50 p-5 shadow-sm">
+                <div className="text-sm text-green-700">Маржа</div>
+                <div className="mt-2 text-3xl font-bold text-green-700">
+                  {Math.round(totalMargin).toLocaleString("ru-RU")} ₽
+                </div>
+                <div className="mt-1 text-xs text-green-700">
+                  Маржинальность: {marginPercent.toFixed(1)}%
+                </div>
+              </div>
+            </div>
 
             {ordersWithoutManager > 0 && (
-              <div className="mt-6 rounded-xl border border-amber-800 bg-amber-900/20 p-4">
-                <div className="font-semibold text-amber-400">
+              <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="font-semibold text-amber-800">
                   Заказов без менеджера: {ordersWithoutManager}
                 </div>
-                <div className="mt-1 text-sm text-amber-300/70">
+                <div className="mt-1 text-sm text-amber-700">
                   Эти заказы поступили с сайта и не назначены ни на одного менеджера.
                 </div>
               </div>
             )}
+
             {stuckOrdersCount > 0 && (
-  <div className="mt-6 rounded-xl border border-red-800 bg-red-900/20">
-    <div className="border-b border-red-800/50 px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-red-400">
-            ⚠️ Зависшие заказы: {stuckOrdersCount}
-          </h2>
-          <p className="mt-1 text-sm text-red-300/70">
-            Не оплачены и без движения более {STUCK_HOURS} часов
-          </p>
-        </div>
-      </div>
-    </div>
+              <div className="mt-6 rounded-xl border border-red-200 bg-white shadow-sm">
+                <div className="border-b border-red-200 bg-red-50 px-6 py-4">
+                  <h2 className="font-semibold text-red-800">
+                    ⚠️ Зависшие заказы: {stuckOrdersCount}
+                  </h2>
+                  <p className="mt-1 text-sm text-red-700">
+                    Не оплачены и без движения более {STUCK_HOURS} часов
+                  </p>
+                </div>
 
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-red-800/50 text-left text-red-300/70">
-            <th className="px-4 py-3 font-medium">№ заказа</th>
-            <th className="px-4 py-3 font-medium">Клиент</th>
-            <th className="px-4 py-3 font-medium">Менеджер</th>
-            <th className="px-4 py-3 font-medium">Сумма</th>
-            <th className="px-4 py-3 font-medium">Простой</th>
-            <th className="px-4 py-3 font-medium">Обновлён</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stuckOrders.slice(0, 20).map((order) => {
-            const hours = hoursSince(order.dateUpdated);
-            const days = Math.floor(hours / 24);
-            return (
-              <tr key={order.number} className="border-b border-red-800/30 hover:bg-red-900/20">
-                <td className="px-4 py-3 font-medium text-blue-400">{order.number}</td>
-                <td className="px-4 py-3 text-slate-300">{order.userName || "—"}</td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={"/manager/" + (order.managerId || "0")}
-                    className="text-slate-300 hover:text-blue-400"
-                  >
-                    {getManagerName(order.managerId, managers)}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-slate-300">
-                  {Number(order.sum || 0).toLocaleString("ru-RU")} ₽
-                </td>
-                <td className="px-4 py-3">
-                  <span className={days >= 7 ? "text-red-400 font-semibold" : "text-amber-400"}>
-                    {days > 0 ? days + " дн" : hours + " ч"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-slate-400">{order.dateUpdated}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
+                        <th className="px-4 py-3 font-medium">№ заказа</th>
+                        <th className="px-4 py-3 font-medium">Клиент</th>
+                        <th className="px-4 py-3 font-medium">Менеджер</th>
+                        <th className="px-4 py-3 font-medium">Сумма</th>
+                        <th className="px-4 py-3 font-medium">Простой</th>
+                        <th className="px-4 py-3 font-medium">Обновлён</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stuckOrders.slice(0, 20).map((order) => {
+                        const hours = hoursSince(order.dateUpdated);
+                        const days = Math.floor(hours / 24);
+                        return (
+                          <tr key={order.number} className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className="px-4 py-3 font-medium text-blue-600">{order.number}</td>
+                            <td className="px-4 py-3 text-slate-700">{order.userName || "—"}</td>
+                            <td className="px-4 py-3">
+                              <Link
+                                href={"/manager/" + (order.managerId || "0")}
+                                className="text-slate-700 hover:text-blue-600"
+                              >
+                                {getManagerName(order.managerId, managers)}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {Number(order.sum || 0).toLocaleString("ru-RU")} ₽
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={days >= 7 ? "font-semibold text-red-600" : "text-amber-600"}>
+                                {days > 0 ? days + " дн" : hours + " ч"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500">{order.dateUpdated}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-    {stuckOrders.length > 20 && (
-      <div className="border-t border-red-800/50 px-6 py-3 text-center text-sm text-red-300/70">
-        Показано первые 20 из {stuckOrders.length} зависших заказов
-      </div>
-    )}
-  </div>
-)}
+                {stuckOrders.length > 20 && (
+                  <div className="border-t border-slate-200 bg-slate-50 px-6 py-3 text-center text-sm text-slate-600">
+                    Показано первые 20 из {stuckOrders.length} зависших заказов
+                  </div>
+                )}
+              </div>
+            )}
 
-            <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
-              <div className="border-b border-slate-800 px-6 py-4">
-                <h2 className="font-semibold">Статистика по менеджерам</h2>
+            {/* Статистика по менеджерам */}
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h2 className="font-semibold text-slate-900">Статистика по менеджерам</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-800 text-left text-slate-400">
-                    <th className="px-4 py-3 font-medium">Менеджер</th>
-                    <th className="px-4 py-3 font-medium">Заказов</th>
-                    <th className="px-4 py-3 font-medium">Выручка</th>
-                    <th className="px-4 py-3 font-medium">Маржа</th>
-                    <th className="px-4 py-3 font-medium">Маржинальность</th>
-                    <th className="px-4 py-3 font-medium">Оплачено</th>
-                    <th className="px-4 py-3 font-medium">Средний чек</th>
+                    <tr className="border-b border-slate-200 text-left text-slate-500">
+                      <th className="px-4 py-3 font-medium">Менеджер</th>
+                      <th className="px-4 py-3 font-medium">Заказов</th>
+                      <th className="px-4 py-3 font-medium">Выручка</th>
+                      <th className="px-4 py-3 font-medium">Маржа</th>
+                      <th className="px-4 py-3 font-medium">Маржинальность</th>
+                      <th className="px-4 py-3 font-medium">Оплачено</th>
+                      <th className="px-4 py-3 font-medium">Средний чек</th>
                     </tr>
                   </thead>
                   <tbody>
                     {managerStats.map((m) => (
-  <tr key={m.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-    <td className="px-4 py-3 font-medium">
-      {m.id === "0" ? (
-        <Link href={"/manager/" + m.id} className="text-amber-400 hover:text-amber-300">
-          {m.name}
-        </Link>
-      ) : (
-        <Link href={"/manager/" + m.id} className="text-white hover:text-blue-400">
-          {m.name}
-        </Link>
-      )}
-    </td>
-    <td className="px-4 py-3 text-slate-300">{m.ordersCount}</td>
-    <td className="px-4 py-3 text-slate-300">
-      {m.revenue.toLocaleString("ru-RU")} ₽
-    </td>
-    <td className="px-4 py-3 font-medium text-green-400">
-      {Math.round(m.margin).toLocaleString("ru-RU")} ₽
-    </td>
-    <td className="px-4 py-3">
-      <span className={
-        m.marginPercent >= 15 ? "text-green-400" :
-        m.marginPercent >= 5 ? "text-amber-400" :
-        "text-red-400"
-      }>
-        {m.marginPercent.toFixed(1)}%
-      </span>
-    </td>
-    <td className="px-4 py-3 text-slate-300">{m.paidCount}</td>
-    <td className="px-4 py-3 text-slate-300">
-      {Math.round(m.avgCheck).toLocaleString("ru-RU")} ₽
-    </td>
-  </tr>
-))}
+                      <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium">
+                          {m.id === "0" ? (
+                            <Link href={"/manager/" + m.id} className="text-amber-600 hover:text-amber-700">
+                              {m.name}
+                            </Link>
+                          ) : (
+                            <Link href={"/manager/" + m.id} className="text-slate-900 hover:text-blue-600">
+                              {m.name}
+                            </Link>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{m.ordersCount}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {m.revenue.toLocaleString("ru-RU")} ₽
+                        </td>
+                        <td className="px-4 py-3 font-medium text-green-700">
+                          {Math.round(m.margin).toLocaleString("ru-RU")} ₽
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={
+                            m.marginPercent >= 15 ? "text-green-700 font-medium" :
+                            m.marginPercent >= 5 ? "text-amber-600 font-medium" :
+                            "text-red-600 font-medium"
+                          }>
+                            {m.marginPercent.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{m.paidCount}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {Math.round(m.avgCheck).toLocaleString("ru-RU")} ₽
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
-              <div className="border-b border-slate-800 px-6 py-4">
-                <h2 className="font-semibold">Заказы за период</h2>
+            {/* Заказы за период */}
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h2 className="font-semibold text-slate-900">Заказы за период</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-800 text-left text-slate-400">
+                    <tr className="border-b border-slate-200 text-left text-slate-500">
                       <th className="px-4 py-3 font-medium">№ заказа</th>
                       <th className="px-4 py-3 font-medium">Клиент</th>
                       <th className="px-4 py-3 font-medium">Менеджер</th>
@@ -438,27 +423,29 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   </thead>
                   <tbody>
                     {orders.map((order) => (
-                      <tr key={order.number} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                        <td className="px-4 py-3 font-medium text-blue-400">{order.number}</td>
-                        <td className="px-4 py-3 text-slate-300">{order.userName || "—"}</td>
+                      <tr key={order.number} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-blue-600">{order.number}</td>
+                        <td className="px-4 py-3 text-slate-700">{order.userName || "—"}</td>
                         <td className="px-4 py-3">
-  <Link
-    href={"/manager/" + (order.managerId || "0")}
-    className="text-slate-300 hover:text-blue-400"
-  >
-    {getManagerName(order.managerId, managers)}
-  </Link>
-</td>
-                        <td className="px-4 py-3 text-slate-300">{Number(order.sum || 0).toLocaleString("ru-RU")} ₽</td>
-                        <td className="px-4 py-3 text-slate-300">{order.positionsQuantity}</td>
+                          <Link
+                            href={"/manager/" + (order.managerId || "0")}
+                            className="text-slate-700 hover:text-blue-600"
+                          >
+                            {getManagerName(order.managerId, managers)}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {Number(order.sum || 0).toLocaleString("ru-RU")} ₽
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{order.positionsQuantity}</td>
                         <td className="px-4 py-3">
                           {order.paid ? (
-                            <span className="text-green-400">Да</span>
+                            <span className="text-green-600 font-medium">Да</span>
                           ) : (
-                            <span className="text-amber-400">Нет</span>
+                            <span className="text-amber-600 font-medium">Нет</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-400">{order.dateUpdated}</td>
+                        <td className="px-4 py-3 text-slate-500">{order.dateUpdated}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -468,6 +455,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </>
         )}
       </div>
-    </main>
+    </AppLayout>
   );
 }
