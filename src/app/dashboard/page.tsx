@@ -255,11 +255,15 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                       return (
                         <tr key={m.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                           <td className="px-4 py-3 font-medium">
-                            {m.id === "0" ? (
-                              <span className="text-amber-400">{m.name}</span>
-                            ) : (
-                              <span className="text-white">{m.name}</span>
-                            )}
+                           {m.id === "0" ? (
+  <Link href={"/manager/" + m.id} className="text-amber-400 hover:text-amber-300">
+    {m.name}
+  </Link>
+) : (
+  <Link href={"/manager/" + m.id} className="text-white hover:text-blue-400">
+    {m.name}
+  </Link>
+)}
                           </td>
                           <td className="px-4 py-3 text-slate-300">{m.ordersCount}</td>
                           <td className="px-4 py-3 text-slate-300">
@@ -302,7 +306,14 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                       <tr key={order.number} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                         <td className="px-4 py-3 font-medium text-blue-400">{order.number}</td>
                         <td className="px-4 py-3 text-slate-300">{order.userName || "—"}</td>
-                        <td className="px-4 py-3 text-slate-300">{getManagerName(order.managerId, managers)}</td>
+                        <td className="px-4 py-3">
+  <Link
+    href={"/manager/" + (order.managerId || "0")}
+    className="text-slate-300 hover:text-blue-400"
+  >
+    {getManagerName(order.managerId, managers)}
+  </Link>
+</td>
                         <td className="px-4 py-3 text-slate-300">{Number(order.sum || 0).toLocaleString("ru-RU")} ₽</td>
                         <td className="px-4 py-3 text-slate-300">{order.positionsQuantity}</td>
                         <td className="px-4 py-3">
