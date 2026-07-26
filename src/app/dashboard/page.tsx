@@ -9,6 +9,7 @@ import {
 } from "@/lib/abcp";
 import { getShop } from "@/lib/shop";
 import { AppLayout } from "@/components/AppLayout";
+import { RevenueChart } from "@/components/RevenueChart";
 
 type Order = {
   number: string;
@@ -203,6 +204,37 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   const managerStats = calcManagerStats(orders, managers);
 
+  // Подготовка данных для графика
+  const chartMap = new Map<string, { revenue: number; margin: number; time: number }>();
+  for (const order of orders) {
+    const dateStr = order.date.split(" ")[0]; // Берем только дату "ГГГГ-ММ-ДД"
+    const orderDate = new Date(dateStr);
+    if (isNaN(orderDate.getTime())) continue;
+
+    const day = String(orderDate.getDate()).padStart(2, "0");
+    const month = String(orderDate.getMonth() + 1).padStart(2, "0");
+    const dateKey = `${day}.${month}`;
+
+    const sum = Number(order.sum || 0);
+    const margin = calcOrderMargin(order.positions);
+
+    const existing = chartMap.get(dateKey);
+    if (existing) {
+      existing.revenue += sum;
+      existing.margin += margin;
+    } else {
+      chartMap.set(dateKey, { revenue: sum, margin: margin, time: orderDate.getTime() });
+    }
+  }
+
+  const chartData = Array.from(chartMap.entries())
+    .sort((a, b) => a[1].time - b[1].time)
+    .map(([date, values]) => ({
+      date,
+      revenue: Math.round(values.revenue),
+      margin: Math.round(values.margin),
+    }));
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-7xl">
@@ -268,6 +300,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   Маржинальность: {marginPercent.toFixed(1)}%
                 </div>
               </div>
+            </div>
+
+            {/* График выручки и маржи */}
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 font-semibold text-slate-900">Динамика выручки и маржи</h2>
+              <RevenueChart data={chartData} />
             </div>
 
             {ordersWithoutManager > 0 && (
