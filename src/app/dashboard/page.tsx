@@ -12,6 +12,13 @@ type Order = {
   managerId: string;
 };
 
+type Manager = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
 async function getOrders(): Promise<Order[]> {
   const dateStart = new Date();
   dateStart.setDate(dateStart.getDate() - 30);
@@ -29,12 +36,27 @@ async function getOrders(): Promise<Order[]> {
   return data;
 }
 
+async function getManagers(): Promise<Manager[]> {
+  return abcpRequest<Manager[]>("cp/managers");
+}
+
+function getManagerName(managerId: string, managers: Manager[]): string {
+  if (!managerId || managerId === "0") return "—";
+  const manager = managers.find((m) => m.id === managerId);
+  if (!manager) return "ID: " + managerId;
+  const fullName = (manager.firstName + " " + manager.lastName).trim();
+  return fullName || manager.email || "ID: " + managerId;
+}
+
 export default async function DashboardPage() {
   let orders: Order[] = [];
+  let managers: Manager[] = [];
   let error: string | null = null;
 
   try {
-    orders = await getOrders();
+    const results = await Promise.all([getOrders(), getManagers()]);
+    orders = results[0];
+    managers = results[1];
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
   }
@@ -46,6 +68,9 @@ export default async function DashboardPage() {
   );
   const paidOrders = orders.filter((order) => order.paid).length;
   const avgCheck = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const ordersWithoutManager = orders.filter(
+    (o) => !o.managerId || o.managerId === "0"
+  ).length;
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -54,10 +79,7 @@ export default async function DashboardPage() {
           <Link href="/" className="text-lg font-bold text-blue-400">
             ABCP Dashboard
           </Link>
-          <Link
-            href="/api-test"
-            className="text-sm text-slate-400 hover:text-white"
-          >
+          <Link href="/api-test" className="text-sm text-slate-400 hover:text-white">
             API test
           </Link>
         </div>
@@ -80,21 +102,16 @@ export default async function DashboardPage() {
                 <div className="text-sm text-slate-400">Заказов</div>
                 <div className="mt-2 text-3xl font-bold">{totalOrders}</div>
               </div>
-
               <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div className="text-sm text-slate-400">Выручка</div>
                 <div className="mt-2 text-3xl font-bold">
                   {totalRevenue.toLocaleString("ru-RU")} ₽
                 </div>
               </div>
-
               <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div className="text-sm text-slate-400">Оплачено</div>
-                <div className="mt-2 text-3xl font-bold text-green-400">
-                  {paidOrders}
-                </div>
+                <div className="mt-2 text-3xl font-bold text-green-400">{paidOrders}</div>
               </div>
-
               <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div className="text-sm text-slate-400">Средний чек</div>
                 <div className="mt-2 text-3xl font-bold">
@@ -103,11 +120,21 @@ export default async function DashboardPage() {
               </div>
             </div>
 
+            {ordersWithoutManager > 0 && (
+              <div className="mt-6 rounded-xl border border-amber-800 bg-amber-900/20 p-4">
+                <div className="font-semibold text-amber-400">
+                  Заказов без менеджера: {ordersWithoutManager}
+                </div>
+                <div className="mt-1 text-sm text-amber-300/70">
+                  Эти заказы поступили с сайта и не назначены ни на одного менеджера.
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-6 py-4">
                 <h2 className="font-semibold">Заказы за 30 дней</h2>
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -123,25 +150,12 @@ export default async function DashboardPage() {
                   </thead>
                   <tbody>
                     {orders.map((order) => (
-                      <tr
-                        key={order.number}
-                        className="border-b border-slate-800/50 hover:bg-slate-800/30"
-                      >
-                        <td className="px-4 py-3 font-medium text-blue-400">
-                          {order.number}
-                        </td>
-                        <td className="px-4 py-3 text-slate-300">
-                          {order.userName || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-slate-300">
-                          {order.managerId || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-slate-300">
-                          {Number(order.sum || 0).toLocaleString("ru-RU")} ₽
-                        </td>
-                        <td className="px-4 py-3 text-slate-300">
-                          {order.positionsQuantity}
-                        </td>
+                      <tr key={order.number} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                        <td className="px-4 py-3 font-medium text-blue-400">{order.number}</td>
+                        <td className="px-4 py-3 text-slate-300">{order.userName || "—"}</td>
+                        <td className="px-4 py-3 text-slate-300">{getManagerName(order.managerId, managers)}</td>
+                        <td className="px-4 py-3 text-slate-300">{Number(order.sum || 0).toLocaleString("ru-RU")} ₽</td>
+                        <td className="px-4 py-3 text-slate-300">{order.positionsQuantity}</td>
                         <td className="px-4 py-3">
                           {order.paid ? (
                             <span className="text-green-400">Да</span>
@@ -149,9 +163,7 @@ export default async function DashboardPage() {
                             <span className="text-amber-400">Нет</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-400">
-                          {order.dateUpdated}
-                        </td>
+                        <td className="px-4 py-3 text-slate-400">{order.dateUpdated}</td>
                       </tr>
                     ))}
                   </tbody>
