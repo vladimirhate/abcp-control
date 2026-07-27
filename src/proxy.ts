@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -24,15 +24,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Проверяем сессию пользователя
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Если пользователь не авторизован и пытается зайти не на /login -> кидаем на /login
   if (!user && !request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Если пользователь авторизован, но пытается зайти на /login -> кидаем на дашборд
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
@@ -40,7 +37,6 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
-// Указываем, на какие маршруты не распространяется middleware (статика, API, логин)
 export const config = {
   matcher: ['/((?!login|api|_next/static|_next/image|favicon.ico).*)'],
 }
