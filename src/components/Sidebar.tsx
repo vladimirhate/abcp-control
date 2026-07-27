@@ -41,14 +41,15 @@ const menu: MenuSection[] = [
       { href: "/salary", label: "Зарплата", icon: Wallet },
     ],
   },
-  {
+    {
     title: "Аналитика",
     items: [
       { href: "/clients", label: "Клиенты", icon: Users },
+      { href: "/clients-analytics", label: "Аналитика клиентов", icon: TrendingUp }, // <--- Добавь это
       { href: "/brands", label: "Бренды", icon: Tag },
       { href: "/articles", label: "Артикулы", icon: Package },
       { href: "/suppliers", label: "Поставщики", icon: Truck },
-      { href: "/finance", label: "Финансы", icon: TrendingUp },
+      { href: "/finance", label: "Финансы", icon: Wallet },
     ],
   },
   {
@@ -82,9 +83,7 @@ export function Sidebar() {
             )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                                const isActive = pathname === item.href;
                 const Icon = item.icon;
 
                 return (
