@@ -155,11 +155,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, data: newShop });
     }
 
-    return NextResponse.json({ success: true, data: updatedShop });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("PUT /api/shop Error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Неизвестная ошибка при сохранении" },
+      { success: false, error: error?.message || JSON.stringify(error) || "Неизвестная ошибка при сохранении" },
       { status: 500 }
     );
   }
-}
