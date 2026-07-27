@@ -6,7 +6,6 @@ export async function GET() {
   try {
     const shop = await getShop();
     if (!shop) throw new Error("Магазин не найден");
-
     const data = await getAlertsSettings(shop.id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
@@ -21,11 +20,19 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
-    const updateData: Record<string, number | string | boolean> = {};
+    const updateData: Record<string, number | string | boolean | number[]> = {};
     if (body.stuck_order_hours !== undefined) updateData.stuck_order_hours = Number(body.stuck_order_hours);
     if (body.daily_report_enabled !== undefined) updateData.daily_report_enabled = Boolean(body.daily_report_enabled);
     if (body.daily_report_time !== undefined) updateData.daily_report_time = body.daily_report_time;
     if (body.telegram_chat_id !== undefined) updateData.telegram_chat_id = body.telegram_chat_id;
+    
+    // Обработка массивов статусов
+    if (body.client_cancel_statuses !== undefined) {
+      updateData.client_cancel_statuses = Array.isArray(body.client_cancel_statuses) ? body.client_cancel_statuses.map(Number) : [];
+    }
+    if (body.supplier_cancel_statuses !== undefined) {
+      updateData.supplier_cancel_statuses = Array.isArray(body.supplier_cancel_statuses) ? body.supplier_cancel_statuses.map(Number) : [];
+    }
 
     const { data, error } = await supabaseAdmin
       .from("alerts_settings")
@@ -35,7 +42,6 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) throw error;
-
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Ошибка" }, { status: 500 });

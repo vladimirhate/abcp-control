@@ -32,6 +32,8 @@ export type AlertsSettings = {
   daily_report_enabled: boolean;
   daily_report_time: string;
   telegram_chat_id: string | null;
+  client_cancel_statuses: number[];
+  supplier_cancel_statuses: number[];
 };
 
 // Получаем ID текущего авторизованного пользователя
