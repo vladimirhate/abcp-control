@@ -4,6 +4,7 @@ import { getShop } from "@/lib/shop";
 import { AppLayout } from "@/components/AppLayout";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { getRange } from "@/lib/dates";
+import { CreateTaskButton } from "@/components/CreateTaskButton"; // Импорт кнопки
 
 type OrderPosition = {
   priceIn: number;
@@ -114,7 +115,6 @@ export default async function LostMarginPage({ searchParams }: PageProps) {
       const qty = Number(pos.quantityFinal || pos.quantity || 0);
       const priceIn = Number(pos.priceIn || 0);
       const priceOut = Number(pos.priceOut || 0);
-      // Если oldPriceOut = 0, значит цену не меняли. Считаем что oldPrice = priceOut
       const oldPriceOut = Number(pos.oldPriceOut || 0) > 0 ? Number(pos.oldPriceOut) : priceOut;
 
       const plannedMargin = (oldPriceOut - priceIn) * qty;
@@ -126,7 +126,6 @@ export default async function LostMarginPage({ searchParams }: PageProps) {
       orderOldRevenue += oldPriceOut * qty;
       orderActualRevenue += priceOut * qty;
 
-      // Если менеджер дал скидку (цена продажи стала ниже начальной)
       if (oldPriceOut > priceOut) {
         const lost = (oldPriceOut - priceOut) * qty;
         totalLostMargin += lost;
@@ -224,6 +223,7 @@ export default async function LostMarginPage({ searchParams }: PageProps) {
                         <th className="px-4 py-3 font-medium">Менеджер</th>
                         <th className="px-4 py-3 font-medium">Заказов со скидками</th>
                         <th className="px-4 py-3 font-medium">Потерянная маржа</th>
+                        <th className="px-4 py-3 font-medium">Действие</th> {/* Новая колонка */}
                       </tr>
                     </thead>
                     <tbody>
@@ -235,6 +235,9 @@ export default async function LostMarginPage({ searchParams }: PageProps) {
                           <td className="px-4 py-3 text-slate-700">{m.discountsCount}</td>
                           <td className="px-4 py-3 font-medium text-red-600">
                             {Math.round(m.lostMargin).toLocaleString("ru-RU")} ₽
+                          </td>
+                          <td className="px-4 py-3">
+                            <CreateTaskButton clientId={m.id} clientName={m.name} />
                           </td>
                         </tr>
                       ))}

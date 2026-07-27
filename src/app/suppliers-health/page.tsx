@@ -8,14 +8,14 @@ type Distributor = {
   isEnabled: boolean;
   updateTime: string | null;
   updateRateInDays: number;
-  positionsNumber: number;
+  positionsNumber: number | string;
 };
 
 async function getDistributors(): Promise<Distributor[]> {
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден в БД");
 
-  const data = await abcpRequest<Distributor[]>(
+  return abcpRequest<Distributor[]>(
     "cp/distributors",
     {},
     {
@@ -24,10 +24,6 @@ async function getDistributors(): Promise<Distributor[]> {
       api_password_md5: shop.api_password_md5,
     }
   );
-
-  console.log("[SUPPLIERS HEALTH] Первые 2 поставщика из API:", JSON.stringify(data.slice(0, 2), null, 2));
-
-  return data;
 }
 
 export default async function SuppliersHealthPage() {
@@ -47,7 +43,6 @@ export default async function SuppliersHealthPage() {
       return { ...d, status: "disabled" as const, daysSinceUpdate: null };
     }
 
-       // Если updateTime пустое — значит это онлайн-поставщик, прайс всегда живой
     if (!d.updateTime) {
       return { ...d, status: "online" as const, daysSinceUpdate: null };
     }
@@ -56,10 +51,7 @@ export default async function SuppliersHealthPage() {
     const diffTime = now.getTime() - updateDate.getTime();
     const daysSince = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    // Если норма обновления не указана (0), считаем что норма = 7 дней
     const rateInDays = d.updateRateInDays > 0 ? d.updateRateInDays : 7;
-    
-    // Проверяем просрочку
     const isOutdated = daysSince > rateInDays;
 
     return {
@@ -69,7 +61,6 @@ export default async function SuppliersHealthPage() {
     };
   });
 
-  // Сортируем: сначала устаревшие, потом отключенные, потом ок
   const sortPriority = { outdated: 0, disabled: 1, ok: 2, online: 3 };
   processedDistributors.sort((a, b) => sortPriority[a.status] - sortPriority[b.status]);
 

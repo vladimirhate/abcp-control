@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { TaskModal } from "@/components/TaskModal";
-import { CheckSquare, Plus } from "lucide-react";
+import { CheckSquare, Plus, Check } from "lucide-react";
 
 type Task = {
   id: string;
@@ -27,6 +26,11 @@ export default function TasksPage() {
     const data = await res.json();
     if (data.success) setTasks(data.data);
     setLoading(false);
+  }
+
+  async function closeTask(id: string) {
+    await fetch(`/api/tasks/${id}`, { method: "PATCH" });
+    fetchTasks();
   }
 
   useEffect(() => {
@@ -61,16 +65,21 @@ export default function TasksPage() {
             <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">Задач пока нет.</div>
           ) : (
             tasks.map(task => (
-              <div key={task.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div key={task.id} className={`rounded-xl border bg-white p-5 shadow-sm ${task.status === 'done' ? 'border-slate-200 opacity-60' : 'border-slate-200'}`}>
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                    <h3 className={`font-semibold text-slate-900 ${task.status === 'done' ? 'line-through' : ''}`}>{task.title}</h3>
                     {task.related_client_name && <p className="text-xs text-slate-500 mt-1">Клиент: {task.related_client_name}</p>}
                     {task.description && <p className="mt-2 text-sm text-slate-600">{task.description}</p>}
                   </div>
-                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${task.status === 'done' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {task.status === 'done' ? 'Выполнено' : 'В работе'}
-                  </span>
+                  {task.status !== 'done' && (
+                    <button 
+                      onClick={() => closeTask(task.id)}
+                      className="flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
+                    >
+                      <Check size={14} /> Выполнено
+                    </button>
+                  )}
                 </div>
               </div>
             ))
