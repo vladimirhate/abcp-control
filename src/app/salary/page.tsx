@@ -74,8 +74,15 @@ export default async function SalaryPage() {
   let salaryRule: SalaryRules | null = null;
   let error: string | null = null;
 
-  try {
-    const results = await Promise.all([getOrders(), getManagers(), getSalaryRule()]);
+    try {
+    const shop = await getShop();
+    if (!shop) throw new Error("Магазин не найден в БД");
+    
+    const results = await Promise.all([
+      getOrders(), 
+      getManagers(), 
+      getSalaryRule(shop.id)
+    ]);
     orders = results[0];
     managers = results[1];
     const rule = results[2];
