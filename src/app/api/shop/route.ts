@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 // GET — получить данные магазина текущего пользователя
 export async function GET() {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -32,7 +32,7 @@ export async function GET() {
 // POST — создать магазин (при первом подключении)
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Проверяем, нет ли уже магазина у этого юзера
     const { data: existing } = await supabaseAdmin
       .from("shops")
       .select("id")
@@ -52,7 +51,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Магазин уже подключен" }, { status: 400 });
     }
 
-    // Создаем магазин
     const { data: shopData, error: shopError } = await supabaseAdmin
       .from("shops")
       .insert({
@@ -67,7 +65,6 @@ export async function POST(request: NextRequest) {
 
     if (shopError) throw shopError;
 
-    // Создаем дефолтные правила ЗП
     await supabaseAdmin.from("salary_rules").insert({
       shop_id: shopData.id,
       name: "Основная схема",
@@ -80,7 +77,6 @@ export async function POST(request: NextRequest) {
       is_default: true,
     });
 
-    // Создаем дефолтные настройки алертов
     await supabaseAdmin.from("alerts_settings").insert({
       shop_id: shopData.id,
       stuck_order_hours: 24,
@@ -99,7 +95,7 @@ export async function POST(request: NextRequest) {
 // PUT — обновить данные магазина
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

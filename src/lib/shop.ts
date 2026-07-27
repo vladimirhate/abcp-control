@@ -36,7 +36,7 @@ export type AlertsSettings = {
 
 // Получаем ID текущего авторизованного пользователя
 export async function getCurrentUserId(): Promise<string | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
 }
