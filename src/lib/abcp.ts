@@ -4,7 +4,6 @@ type ShopCredentials = {
   api_password_md5: string;
 };
 
-// Форматируем дату в формат ABCP: "2025-01-15 00:00:00"
 export function formatDate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -12,7 +11,6 @@ export function formatDate(date: Date): string {
   const h = String(date.getHours()).padStart(2, "0");
   const min = String(date.getMinutes()).padStart(2, "0");
   const s = String(date.getSeconds()).padStart(2, "0");
-
   return `${y}-${m}-${d} ${h}:${min}:${s}`;
 }
 
@@ -37,7 +35,6 @@ export async function abcpRequest<T>(
 
   const url = `${siteUrl}/${endpoint}?${searchParams.toString()}`;
 
-  // Создаем контроллер для ограничения времени запроса (8.5 секунд)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8500);
 
@@ -45,18 +42,31 @@ export async function abcpRequest<T>(
     const response = await fetch(url, {
       method: "GET",
       cache: "no-store",
-      signal: controller.signal, // Передаем сигнал прерывания
+      signal: controller.signal,
     });
 
     if (!response.ok) {
-      throw new Error(`Ошибка API: ${response.status} ${response.statusText}`);
+      let errorDetails = `${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.errorMessage) {
+          errorDetails += ` - ${errorData.errorMessage}`;
+        } else if (errorData && errorData.message) {
+          errorDetails += ` - ${errorData.message}`;
+        } else {
+          errorDetails += ` - ${JSON.stringify(errorData)}`;
+        }
+      } catch (e) {
+        // Если ответ не JSON
+      }
+      throw new Error(`Ошибка API ABCP: ${errorDetails}`);
     }
 
     const data = await response.json();
     return data as T;
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      throw new Error("Время ожидания истекло. Выберите период короче (например, 1 или 3 месяца), сервер ABCP не успел отдать данные.");
+      throw new Error("Время ожидания истекло. Выберите период короче, сервер ABCP не успел отдать данные.");
     }
     throw error;
   } finally {
@@ -80,7 +90,6 @@ export function isStuckOrder(dateUpdated: string, thresholdHours: number = 24): 
   return hours >= thresholdHours;
 }
 
-// --- Расчет маржи ---
 export type OrderPosition = {
   id: string;
   brand: string;
