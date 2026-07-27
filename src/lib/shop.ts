@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase-admin";
+import { createClient } from "./supabase/server";
 
 export type Shop = {
   id: string;
@@ -33,16 +34,23 @@ export type AlertsSettings = {
   telegram_chat_id: string | null;
 };
 
-// Пока хардкодим ID магазина
-// Позже он будет браться из авторизации пользователя
-export const CURRENT_SHOP_ID = "f8c48632-346b-4c90-b451-42b723d6f919";
+// Получаем ID текущего авторизованного пользователя
+export async function getCurrentUserId(): Promise<string | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
 
-export async function getShop(shopId: string = CURRENT_SHOP_ID): Promise<Shop | null> {
+// Получаем магазин текущего пользователя
+export async function getShop(): Promise<Shop | null> {
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
+
   const { data, error } = await supabaseAdmin
     .from("shops")
     .select("*")
-    .eq("id", shopId)
-    .single();
+    .eq("owner_id", userId)
+    .maybeSingle();
 
   if (error) {
     console.error("Ошибка загрузки магазина:", error);
@@ -52,13 +60,13 @@ export async function getShop(shopId: string = CURRENT_SHOP_ID): Promise<Shop | 
   return data as Shop;
 }
 
-export async function getSalaryRule(shopId: string = CURRENT_SHOP_ID): Promise<SalaryRule | null> {
+export async function getSalaryRule(shopId: string): Promise<SalaryRule | null> {
   const { data, error } = await supabaseAdmin
     .from("salary_rules")
     .select("*")
     .eq("shop_id", shopId)
     .eq("is_default", true)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("Ошибка загрузки правил ЗП:", error);
@@ -68,12 +76,12 @@ export async function getSalaryRule(shopId: string = CURRENT_SHOP_ID): Promise<S
   return data as SalaryRule;
 }
 
-export async function getAlertsSettings(shopId: string = CURRENT_SHOP_ID): Promise<AlertsSettings | null> {
+export async function getAlertsSettings(shopId: string): Promise<AlertsSettings | null> {
   const { data, error } = await supabaseAdmin
     .from("alerts_settings")
     .select("*")
     .eq("shop_id", shopId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("Ошибка загрузки настроек алертов:", error);

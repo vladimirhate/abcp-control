@@ -80,6 +80,8 @@ export default async function SalaryPage() {
     managers = results[1];
     const rule = results[2];
 
+        const rule = results[2];
+
     if (rule) {
       salaryRule = {
         baseSalary: Number(rule.base_salary),

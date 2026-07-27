@@ -1,25 +1,96 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { CURRENT_SHOP_ID } from "@/lib/shop";
+import { createClient } from "@/lib/supabase/server";
 
-// GET — получить данные магазина
+// GET — получить данные магазина текущего пользователя
 export async function GET() {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from("shops")
       .select("*")
-      .eq("id", CURRENT_SHOP_ID)
-      .single();
+      .eq("owner_id", user.id)
+      .maybeSingle();
 
     if (error) throw error;
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Неизвестная ошибка",
-      },
+      { success: false, error: error instanceof Error ? error.message : "Ошибка" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST — создать магазин (при первом подключении)
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
+    }
+
+    const body = await request.json();
+
+    // Проверяем, нет ли уже магазина у этого юзера
+    const { data: existing } = await supabaseAdmin
+      .from("shops")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ success: false, error: "Магазин уже подключен" }, { status: 400 });
+    }
+
+    // Создаем магазин
+    const { data: shopData, error: shopError } = await supabaseAdmin
+      .from("shops")
+      .insert({
+        owner_id: user.id,
+        name: body.name,
+        api_url: body.api_url,
+        api_login: body.api_login,
+        api_password_md5: body.api_password_md5,
+      })
+      .select()
+      .single();
+
+    if (shopError) throw shopError;
+
+    // Создаем дефолтные правила ЗП
+    await supabaseAdmin.from("salary_rules").insert({
+      shop_id: shopData.id,
+      name: "Основная схема",
+      base_salary: 30000,
+      revenue_percent: 1,
+      margin_percent: 20,
+      paid_revenue_percent: 2,
+      plan_threshold: 500000,
+      plan_bonus: 5000,
+      is_default: true,
+    });
+
+    // Создаем дефолтные настройки алертов
+    await supabaseAdmin.from("alerts_settings").insert({
+      shop_id: shopData.id,
+      stuck_order_hours: 24,
+      daily_report_enabled: true,
+    });
+
+    return NextResponse.json({ success: true, data: shopData });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "Ошибка" },
       { status: 500 }
     );
   }
@@ -28,6 +99,13 @@ export async function GET() {
 // PUT — обновить данные магазина
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const updateData: Record<string, string> = {};
@@ -39,7 +117,7 @@ export async function PUT(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("shops")
       .update(updateData)
-      .eq("id", CURRENT_SHOP_ID)
+      .eq("owner_id", user.id)
       .select()
       .single();
 
@@ -48,10 +126,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Неизвестная ошибка",
-      },
+      { success: false, error: error instanceof Error ? error.message : "Ошибка" },
       { status: 500 }
     );
   }

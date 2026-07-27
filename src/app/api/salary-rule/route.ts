@@ -1,34 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { CURRENT_SHOP_ID } from "@/lib/shop";
+import { getShop, getSalaryRule } from "@/lib/shop";
 
-// GET — получить правила ЗП
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("salary_rules")
-      .select("*")
-      .eq("shop_id", CURRENT_SHOP_ID)
-      .eq("is_default", true)
-      .single();
+    const shop = await getShop();
+    if (!shop) throw new Error("Магазин не найден");
 
-    if (error) throw error;
-
+    const data = await getSalaryRule(shop.id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Неизвестная ошибка",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Ошибка" }, { status: 500 });
   }
 }
 
-// PUT — обновить правила ЗП
 export async function PUT(request: NextRequest) {
   try {
+    const shop = await getShop();
+    if (!shop) throw new Error("Магазин не найден");
+
     const body = await request.json();
 
     const updateData: Record<string, number | string> = {};
@@ -43,7 +33,7 @@ export async function PUT(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("salary_rules")
       .update(updateData)
-      .eq("shop_id", CURRENT_SHOP_ID)
+      .eq("shop_id", shop.id)
       .eq("is_default", true)
       .select()
       .single();
@@ -52,12 +42,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Неизвестная ошибка",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Ошибка" }, { status: 500 });
   }
 }

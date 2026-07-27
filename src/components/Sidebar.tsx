@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -16,10 +16,12 @@ import {
   Store,
   AlertTriangle,
   HeartPulse,
-  BookOpen,
   XCircle,
   BarChart3,
+  BookOpen,
+  LogOut,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 type MenuItem = {
   href: string;
@@ -46,7 +48,7 @@ const menu: MenuSection[] = [
       { href: "/salary", label: "Зарплата", icon: Wallet },
     ],
   },
-      {
+  {
     title: "Аналитика",
     items: [
       { href: "/clients", label: "Клиенты", icon: Users },
@@ -56,24 +58,30 @@ const menu: MenuSection[] = [
       { href: "/abc-analysis", label: "ABC-анализ", icon: BarChart3 },
       { href: "/suppliers", label: "Поставщики", icon: Truck },
       { href: "/suppliers-health", label: "Здоровье прайсов", icon: HeartPulse },
+      { href: "/lost-margin", label: "Аудит маржи", icon: AlertTriangle },
       { href: "/cancellations", label: "Аналитика отмен", icon: XCircle },
-      { href: "/lost-margin", label: "Аудит маржи", icon: AlertTriangle }, 
       { href: "/finance", label: "Финансы", icon: Wallet },
     ],
   },
   {
-  title: "Сервис",
-  items: [
-    { href: "/settings", label: "Мой магазин", icon: Store },
-    { href: "/settings/salary", label: "Правила ЗП", icon: Wallet },
-    { href: "/settings/alerts", label: "Алерты", icon: Bell },
-    { href: "/docs", label: "Документация", icon: BookOpen },
-  ],
-},
+    title: "Сервис",
+    items: [
+      { href: "/settings", label: "Мой магазин", icon: Store },
+      { href: "/settings/salary", label: "Правила ЗП", icon: Wallet },
+      { href: "/settings/alerts", label: "Алерты", icon: Bell },
+      { href: "/docs", label: "Документация", icon: BookOpen },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col bg-slate-900 text-slate-100">
@@ -93,7 +101,7 @@ export function Sidebar() {
             )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                                const isActive = pathname === item.href;
+                const isActive = pathname === item.href;
                 const Icon = item.icon;
 
                 return (
@@ -117,8 +125,15 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-slate-800 px-6 py-4 text-xs text-slate-500">
-        v0.1 · Beta
+      <div className="border-t border-slate-800 px-6 py-4">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-xs text-slate-500 transition hover:text-white"
+        >
+          <LogOut size={14} />
+          Выйти
+        </button>
+        <div className="mt-2 text-xs text-slate-600">v0.1 · Beta</div>
       </div>
     </aside>
   );
