@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { api_url, api_login, api_password_md5 } = body;
 
@@ -17,7 +25,8 @@ export async function POST(request: NextRequest) {
       userpsw: api_password_md5,
     });
 
-    const url = `${api_url}/cp/managers?${searchParams.toString()}`;
+    const cleanUrl = api_url.endsWith("/") ? api_url.slice(0, -1) : api_url;
+    const url = `${cleanUrl}/cp/managers?${searchParams.toString()}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -28,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Ошибка API: ${response.status} ${response.statusText}`,
+          error: `Ошибка API ABCP: ${response.status} ${response.statusText}`,
         },
         { status: 500 }
       );
@@ -40,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Ошибка ABCP: ${data.errorMessage || "Неверные данные"}`,
+          error: `Ошибка ABCP: ${data.errorMessage || "Неверные данные для подключения"}`,
         },
         { status: 500 }
       );
@@ -50,14 +59,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Подключение работает! Найдено менеджеров: ${managersCount}`,
+      message: `Подключение успешно! Найдено менеджеров: ${managersCount}`,
       managersCount,
     });
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Ошибка подключения",
+        error: error instanceof Error ? error.message : "Ошибка сетевого подключения к API ABCP",
       },
       { status: 500 }
     );
