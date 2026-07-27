@@ -23,13 +23,13 @@ export async function GET() {
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Ошибка" },
+      { success: false, error: error instanceof Error ? error.message : "Ошибка GET" },
       { status: 500 }
     );
   }
 }
 
-// POST — создать магазин (при первом подключении)
+// POST — создать магазин (при первом подключении с страницы /connect)
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -86,13 +86,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: shopData });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Ошибка" },
+      { success: false, error: error instanceof Error ? error.message : "Ошибка POST" },
       { status: 500 }
     );
   }
 }
 
-// PUT — обновить данные магазина
+// PUT — обновить данные магазина (или создать, если вдруг его не было)
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -110,19 +110,55 @@ export async function PUT(request: NextRequest) {
     if (body.api_login) updateData.api_login = body.api_login;
     if (body.api_password_md5) updateData.api_password_md5 = body.api_password_md5;
 
-    const { data, error } = await supabaseAdmin
+    // Пытаемся обновить существующий магазин
+    const { data: updatedShop, error: updateError } = await supabaseAdmin
       .from("shops")
       .update(updateData)
       .eq("owner_id", user.id)
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
-    return NextResponse.json({ success: true, data });
+    // Если магазина не было (updatedShop === null), создаем его
+    if (!updatedShop) {
+      const { data: newShop, error: insertError } = await supabaseAdmin
+        .from("shops")
+        .insert({
+          owner_id: user.id,
+          ...updateData
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Создаем дефолтные правила ЗП и алерты для нового магазина
+      await supabaseAdmin.from("salary_rules").insert({
+        shop_id: newShop.id,
+        name: "Основная схема",
+        base_salary: 30000,
+        revenue_percent: 1,
+        margin_percent: 20,
+        paid_revenue_percent: 2,
+        plan_threshold: 500000,
+        plan_bonus: 5000,
+        is_default: true,
+      });
+
+      await supabaseAdmin.from("alerts_settings").insert({
+        shop_id: newShop.id,
+        stuck_order_hours: 24,
+        daily_report_enabled: true,
+      });
+
+      return NextResponse.json({ success: true, data: newShop });
+    }
+
+    return NextResponse.json({ success: true, data: updatedShop });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Ошибка" },
+      { success: false, error: error instanceof Error ? error.message : "Неизвестная ошибка при сохранении" },
       { status: 500 }
     );
   }
