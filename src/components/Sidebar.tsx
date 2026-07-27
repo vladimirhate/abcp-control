@@ -14,6 +14,7 @@ import {
   Bell,
   TrendingUp,
   Store,
+  AlertTriangle,
 } from "lucide-react";
 
 type MenuItem = {
@@ -41,14 +42,15 @@ const menu: MenuSection[] = [
       { href: "/salary", label: "Зарплата", icon: Wallet },
     ],
   },
-    {
+      {
     title: "Аналитика",
     items: [
       { href: "/clients", label: "Клиенты", icon: Users },
-      { href: "/clients-analytics", label: "Аналитика клиентов", icon: TrendingUp }, // <--- Добавь это
+      { href: "/clients-analytics", label: "Аналитика клиентов", icon: TrendingUp },
       { href: "/brands", label: "Бренды", icon: Tag },
       { href: "/articles", label: "Артикулы", icon: Package },
       { href: "/suppliers", label: "Поставщики", icon: Truck },
+      { href: "/lost-margin", label: "Аудит маржи", icon: AlertTriangle }, // <--- Добавь это
       { href: "/finance", label: "Финансы", icon: Wallet },
     ],
   },
