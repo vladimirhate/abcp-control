@@ -7,9 +7,8 @@ export async function GET() {
     const shop = await getShop();
     if (!shop) throw new Error("Магазин не найден в БД");
 
-    // В ABCP может быть два эндпоинта: cp/statuses или cp/orders/statuses
-    // Попробуем cp/orders/statuses, так как он чаще используется для позиций заказов
-    const data = await abcpRequest<any[]>("cp/orders/statuses", {}, {
+    // В ABCP используется эндпоинт orders/statuses (без cp/)
+    const data = await abcpRequest<any[]>("orders/statuses", {}, {
       api_url: shop.api_url,
       api_login: shop.api_login,
       api_password_md5: shop.api_password_md5,
