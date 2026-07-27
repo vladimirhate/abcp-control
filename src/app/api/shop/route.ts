@@ -21,9 +21,10 @@ export async function GET() {
     if (error) throw error;
 
     return NextResponse.json({ success: true, data });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("GET /api/shop Error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Ошибка GET" },
+      { success: false, error: error?.message || JSON.stringify(error) },
       { status: 500 }
     );
   }
@@ -84,9 +85,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: shopData });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("POST /api/shop Error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Ошибка POST" },
+      { success: false, error: error?.message || JSON.stringify(error) },
       { status: 500 }
     );
   }
@@ -155,6 +157,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, data: newShop });
     }
 
+    return NextResponse.json({ success: true, data: updatedShop });
   } catch (error: any) {
     console.error("PUT /api/shop Error:", error);
     return NextResponse.json(
@@ -162,3 +165,4 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
+}
