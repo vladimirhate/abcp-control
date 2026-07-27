@@ -20,6 +20,7 @@ import {
   BarChart3,
   BookOpen,
   LogOut,
+  CheckSquare,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -45,6 +46,7 @@ const menu: MenuSection[] = [
     items: [
       { href: "/order", label: "Заказы", icon: ShoppingCart },
       { href: "/managers", label: "Менеджеры", icon: UserCog },
+      { href: "/tasks", label: "Задачи", icon: CheckSquare },
       { href: "/salary", label: "Зарплата", icon: Wallet },
     ],
   },
