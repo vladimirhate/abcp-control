@@ -22,7 +22,6 @@ export default function SettingsPage() {
     text: string;
   } | null>(null);
 
-  // Форма
   const [name, setName] = useState("");
   const [apiUrl, setApiUrl] = useState("");
   const [apiLogin, setApiLogin] = useState("");
@@ -39,11 +38,13 @@ export default function SettingsPage() {
           setApiUrl(result.data.api_url || "");
           setApiLogin(result.data.api_login || "");
           setApiPassword(result.data.api_password_md5 || "");
+        } else {
+          setMessage({ type: "error", text: result.error || "Магазин не найден" });
         }
       } catch (e) {
         setMessage({
           type: "error",
-          text: "Не удалось загрузить данные магазина",
+          text: "Не удалось загрузить данные магазина (Сеть)",
         });
       } finally {
         setLoading(false);
@@ -75,7 +76,7 @@ export default function SettingsPage() {
         setMessage({ type: "error", text: result.error });
       }
     } catch (e) {
-      setMessage({ type: "error", text: "Ошибка проверки подключения" });
+      setMessage({ type: "error", text: "Ошибка проверки подключения (Сеть)" });
     } finally {
       setTesting(false);
     }
@@ -106,11 +107,13 @@ export default function SettingsPage() {
         setMessage({ type: "error", text: result.error });
       }
     } catch (e) {
-      setMessage({ type: "error", text: "Ошибка сохранения" });
+      setMessage({ type: "error", text: "Ошибка сохранения (Сеть)" });
     } finally {
       setSaving(false);
     }
   }
+
+  const inputClass = "w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20";
 
   return (
     <AppLayout>
@@ -144,7 +147,7 @@ export default function SettingsPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Например: АвтоМир"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    className={inputClass}
                   />
                 </div>
 
@@ -157,7 +160,7 @@ export default function SettingsPage() {
                     value={apiUrl}
                     onChange={(e) => setApiUrl(e.target.value)}
                     placeholder="https://xxx.public.api.abcp.ru"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    className={inputClass}
                   />
                   <p className="mt-1 text-xs text-slate-500">
                     Без слеша в конце
@@ -173,7 +176,7 @@ export default function SettingsPage() {
                     value={apiLogin}
                     onChange={(e) => setApiLogin(e.target.value)}
                     placeholder="api@xxx"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    className={inputClass}
                   />
                 </div>
 
@@ -186,7 +189,7 @@ export default function SettingsPage() {
                     value={apiPassword}
                     onChange={(e) => setApiPassword(e.target.value)}
                     placeholder="MD5-хэш пароля"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-mono text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    className={inputClass + " font-mono"}
                   />
                   <p className="mt-1 text-xs text-slate-500">
                     Пароль от API уже в формате MD5 (32 символа)
@@ -237,9 +240,10 @@ export default function SettingsPage() {
                 Где найти данные API?
               </h3>
               <ol className="mt-3 space-y-2 text-sm text-slate-600">
-                <li>1. Зайдите в ПУ вашего магазина на ABCP</li>
-                <li>2. Перейдите в раздел Настройки → Данные для доступа к API</li>
-                <li>4. Скопируйте хост логин и MD5-пароль</li>
+                <li>1. Зайдите в админку вашего магазина на ABCP</li>
+                <li>2. Перейдите в раздел Настройки → Персонал</li>
+                <li>3. Создайте или откройте API-администратора</li>
+                <li>4. Скопируйте логин и MD5-пароль</li>
               </ol>
             </div>
           </>
