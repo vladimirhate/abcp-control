@@ -3,7 +3,7 @@ import { getShop } from "@/lib/shop";
 import { redirect } from "next/navigation";
 
 export default async function Home() {
-  const supabase = createClient();
+  const supabase = await createClient(); // Добавлен await
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
