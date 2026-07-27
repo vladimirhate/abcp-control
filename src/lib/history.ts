@@ -41,7 +41,7 @@ export async function fetchStatusHistory(positionIds: string[]): Promise<StatusH
         // API возвращает массив или объект с числовыми ключами (индексами)
         const positionsArray = Array.isArray(data.positions) ? data.positions : Object.values(data.positions);
         
-        positionsArray.forEach((history, index) => {
+                positionsArray.forEach((history: any, index: number) => {
           const posId = chunk[index]; // Сопоставляем индекс с ID позиции из нашего запроса
           if (posId && history) {
             historyMap[posId] = history as HistoryEntry[];
