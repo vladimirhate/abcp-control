@@ -111,22 +111,26 @@ export default function AlertsSettingsPage() {
               <p className="text-xs text-slate-500 mt-1 mb-4">Отметьте галочками статусы, которые система должна считать отказами в аналитике</p>
               
               <div className="grid gap-6 md:grid-cols-2">
-                {/* Отказы клиентов */}
+                                {/* Отказы клиентов */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Отказы клиентов</label>
                   <div className="h-40 overflow-y-auto rounded-lg border border-slate-200 p-3">
-                    {statuses.map(s => (
-                      <div key={s.id} className="flex items-center gap-2 py-1">
-                        <input
-                          type="checkbox"
-                          id={`cl-${s.id}`}
-                          checked={clientCancelStatuses.includes(Number(s.id))}
-                          onChange={() => toggleClientStatus(Number(s.id))}
-                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label htmlFor={`cl-${s.id}`} className="text-sm text-slate-700 cursor-pointer">{s.name}</label>
-                      </div>
-                    ))}
+                    {statuses.length === 0 ? (
+                      <p className="text-xs text-red-500">Статусы не загрузились. Проверьте подключение к API в настройках магазина.</p>
+                    ) : (
+                      statuses.map(s => (
+                        <div key={s.id} className="flex items-center gap-2 py-1">
+                          <input
+                            type="checkbox"
+                            id={`cl-${s.id}`}
+                            checked={clientCancelStatuses.includes(Number(s.id))}
+                            onChange={() => toggleClientStatus(Number(s.id))}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <label htmlFor={`cl-${s.id}`} className="text-sm text-slate-700 cursor-pointer">{s.name}</label>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -134,18 +138,22 @@ export default function AlertsSettingsPage() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Отказы поставщиков</label>
                   <div className="h-40 overflow-y-auto rounded-lg border border-slate-200 p-3">
-                    {statuses.map(s => (
-                      <div key={s.id} className="flex items-center gap-2 py-1">
-                        <input
-                          type="checkbox"
-                          id={`sup-${s.id}`}
-                          checked={supplierCancelStatuses.includes(Number(s.id))}
-                          onChange={() => toggleSupplierStatus(Number(s.id))}
-                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label htmlFor={`sup-${s.id}`} className="text-sm text-slate-700 cursor-pointer">{s.name}</label>
-                      </div>
-                    ))}
+                    {statuses.length === 0 ? (
+                      <p className="text-xs text-red-500">Статусы не загрузились. Проверьте подключение к API в настройках магазина.</p>
+                    ) : (
+                      statuses.map(s => (
+                        <div key={s.id} className="flex items-center gap-2 py-1">
+                          <input
+                            type="checkbox"
+                            id={`sup-${s.id}`}
+                            checked={supplierCancelStatuses.includes(Number(s.id))}
+                            onChange={() => toggleSupplierStatus(Number(s.id))}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <label htmlFor={`sup-${s.id}`} className="text-sm text-slate-700 cursor-pointer">{s.name}</label>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
