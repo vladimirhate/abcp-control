@@ -15,6 +15,10 @@ import {
   TrendingUp,
   Store,
   AlertTriangle,
+  HeartPulse,
+  BookOpen,
+  XCircle,
+  BarChart3,
 } from "lucide-react";
 
 type MenuItem = {
@@ -49,8 +53,11 @@ const menu: MenuSection[] = [
       { href: "/clients-analytics", label: "Аналитика клиентов", icon: TrendingUp },
       { href: "/brands", label: "Бренды", icon: Tag },
       { href: "/articles", label: "Артикулы", icon: Package },
+      { href: "/abc-analysis", label: "ABC-анализ", icon: BarChart3 },
       { href: "/suppliers", label: "Поставщики", icon: Truck },
-      { href: "/lost-margin", label: "Аудит маржи", icon: AlertTriangle }, // <--- Добавь это
+      { href: "/suppliers-health", label: "Здоровье прайсов", icon: HeartPulse },
+      { href: "/cancellations", label: "Аналитика отмен", icon: XCircle },
+      { href: "/lost-margin", label: "Аудит маржи", icon: AlertTriangle }, 
       { href: "/finance", label: "Финансы", icon: Wallet },
     ],
   },
@@ -60,6 +67,7 @@ const menu: MenuSection[] = [
     { href: "/settings", label: "Мой магазин", icon: Store },
     { href: "/settings/salary", label: "Правила ЗП", icon: Wallet },
     { href: "/settings/alerts", label: "Алерты", icon: Bell },
+    { href: "/docs", label: "Документация", icon: BookOpen },
   ],
 },
 ];
