@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+type Manager = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
 
 export function TaskModal({ onClose, onSaved, relatedClientId, relatedClientName }: { 
   onClose: () => void; 
@@ -12,6 +19,26 @@ export function TaskModal({ onClose, onSaved, relatedClientId, relatedClientName
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("all");
   const [saving, setSaving] = useState(false);
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [loadingManagers, setLoadingManagers] = useState(true);
+
+  // Загружаем список менеджеров при открытии окна
+  useEffect(() => {
+    async function fetchManagers() {
+      try {
+        const res = await fetch("/api/abcp/managers");
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setManagers(data.data);
+        }
+      } catch (e) {
+        console.error("Не удалось загрузить менеджеров", e);
+      } finally {
+        setLoadingManagers(false);
+      }
+    }
+    fetchManagers();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,12 +84,17 @@ export function TaskModal({ onClose, onSaved, relatedClientId, relatedClientName
             <select 
               value={assignedTo} 
               onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+              disabled={loadingManagers}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 disabled:bg-slate-50"
             >
               <option value="all">Всем менеджерам</option>
-              <option value="0">Без менеджера (оператору)</option>
-              {/* Сюда позже можно будет динамически подгружать список менеджеров */}
+              {managers.map(m => (
+                <option key={m.id} value={m.id}>
+                  {(m.firstName + " " + m.lastName).trim() || m.email}
+                </option>
+              ))}
             </select>
+            {loadingManagers && <p className="mt-1 text-xs text-slate-400">Загрузка сотрудников...</p>}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Комментарий</label>
