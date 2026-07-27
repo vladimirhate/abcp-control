@@ -3,6 +3,7 @@ import { getShop, getAlertsSettings } from "@/lib/shop";
 import { AppLayout } from "@/components/AppLayout";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { getRange } from "@/lib/dates";
+import { CreateTaskButton } from "@/components/CreateTaskButton";
 
 type OrderPosition = {
   isCanceled: string;
@@ -193,10 +194,8 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 max-w-xs">{c.recommendation}</td>
-                        <td className="px-4 py-3">
-                          <button className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
-                            + Задача
-                          </button>
+                                                <td className="px-4 py-3">
+                          <CreateTaskButton clientId={c.id} clientName={c.name} />
                         </td>
                       </tr>
                     ))}
