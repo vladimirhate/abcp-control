@@ -15,7 +15,6 @@ export default function ConnectPage() {
   const [apiPassword, setApiPassword] = useState("");
   const router = useRouter();
 
-  // Проверяем, может магазин уже подключен
   useEffect(() => {
     async function checkShop() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -27,12 +26,19 @@ export default function ConnectPage() {
       const res = await fetch("/api/shop");
       const data = await res.json();
       if (data.success && data.data) {
-        // Если магазин уже есть — отправляем на дашборд
         router.push("/dashboard");
       }
     }
     checkShop();
   }, [router]);
+
+  function formatUrl(url: string) {
+    let cleanUrl = url.trim().replace(/\/+$/, "");
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = `https://${cleanUrl}`;
+    }
+    return cleanUrl;
+  }
 
   async function handleConnect(e: React.FormEvent) {
     e.preventDefault();
@@ -40,11 +46,10 @@ export default function ConnectPage() {
     setMessage(null);
 
     try {
-      // Сначала тестируем подключение
       const testRes = await fetch("/api/shop/test-connection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_url: apiUrl, api_login: apiLogin, api_password_md5: apiPassword }),
+        body: JSON.stringify({ api_url: formatUrl(apiUrl), api_login: apiLogin, api_password_md5: apiPassword }),
       });
       const testData = await testRes.json();
 
@@ -54,14 +59,13 @@ export default function ConnectPage() {
 
       setMessage({ type: "success", text: "Подключение успешно! Сохраняем..." });
 
-      // Если успешно — сохраняем в БД
       setTesting(false);
       setLoading(true);
       
       const saveRes = await fetch("/api/shop", {
-        method: "POST", // Обрати внимание, теперь POST
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, api_url: apiUrl, api_login: apiLogin, api_password_md5: apiPassword }),
+        body: JSON.stringify({ name, api_url: formatUrl(apiUrl), api_login: apiLogin, api_password_md5: apiPassword }),
       });
       const saveData = await saveRes.json();
 
@@ -98,14 +102,19 @@ export default function ConnectPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">URL API</label>
-            <input
-              type="text"
-              required
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              placeholder="https://xxx.public.api.abcp.ru"
-            />
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <span className="text-slate-500 sm:text-sm">https://</span>
+              </div>
+              <input
+                type="text"
+                required
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 py-2.5 pl-16 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                placeholder="xxx.public.api.abcp.ru"
+              />
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Логин API</label>

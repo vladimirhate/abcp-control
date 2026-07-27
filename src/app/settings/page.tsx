@@ -35,16 +35,15 @@ export default function SettingsPage() {
         if (result.success && result.data) {
           setShop(result.data);
           setName(result.data.name || "");
-          setApiUrl(result.data.api_url || "");
+          // Убираем https:// из URL при загрузке, чтобы поле было чистым
+          setApiUrl(result.data.api_url?.replace(/^https?:\/\//, "") || "");
           setApiLogin(result.data.api_login || "");
           setApiPassword(result.data.api_password_md5 || "");
-        } else {
-          setMessage({ type: "error", text: result.error || "Магазин не найден" });
         }
       } catch (e) {
         setMessage({
           type: "error",
-          text: "Не удалось загрузить данные магазина (Сеть)",
+          text: "Не удалось загрузить данные магазина",
         });
       } finally {
         setLoading(false);
@@ -52,6 +51,15 @@ export default function SettingsPage() {
     }
     loadShop();
   }, []);
+
+  // Функция для правильного формирования URL
+  function formatUrl(url: string) {
+    let cleanUrl = url.trim().replace(/\/+$/, ""); // Убираем пробелы и слеш в конце
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = `https://${cleanUrl}`;
+    }
+    return cleanUrl;
+  }
 
   async function testConnection() {
     setTesting(true);
@@ -62,7 +70,7 @@ export default function SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          api_url: apiUrl,
+          api_url: formatUrl(apiUrl), // Подставляем https://
           api_login: apiLogin,
           api_password_md5: apiPassword,
         }),
@@ -76,7 +84,7 @@ export default function SettingsPage() {
         setMessage({ type: "error", text: result.error });
       }
     } catch (e) {
-      setMessage({ type: "error", text: "Ошибка проверки подключения (Сеть)" });
+      setMessage({ type: "error", text: "Ошибка проверки подключения" });
     } finally {
       setTesting(false);
     }
@@ -92,7 +100,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          api_url: apiUrl,
+          api_url: formatUrl(apiUrl), // Подставляем https://
           api_login: apiLogin,
           api_password_md5: apiPassword,
         }),
@@ -107,7 +115,7 @@ export default function SettingsPage() {
         setMessage({ type: "error", text: result.error });
       }
     } catch (e) {
-      setMessage({ type: "error", text: "Ошибка сохранения (Сеть)" });
+      setMessage({ type: "error", text: "Ошибка сохранения" });
     } finally {
       setSaving(false);
     }
@@ -155,13 +163,18 @@ export default function SettingsPage() {
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     URL API
                   </label>
-                  <input
-                    type="text"
-                    value={apiUrl}
-                    onChange={(e) => setApiUrl(e.target.value)}
-                    placeholder="https://xxx.public.api.abcp.ru"
-                    className={inputClass}
-                  />
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <span className="text-slate-500 sm:text-sm">https://</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                      placeholder="xxx.public.api.abcp.ru"
+                      className={inputClass + " pl-16"} // Отступ слева для текста https://
+                    />
+                  </div>
                   <p className="mt-1 text-xs text-slate-500">
                     Без слеша в конце
                   </p>
