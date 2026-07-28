@@ -8,8 +8,8 @@ type Client = {
   name: string;
   organizationName: string;
   profileId: string;
-  state: number;
-  debt: number;
+  state: number | string;
+  debt: number | string;
   businessName: string;
   city: string;
 };
@@ -18,6 +18,12 @@ type Profile = {
   profileId: string;
   name: string;
 };
+
+// Безопасное преобразование в число
+function safeNum(val: any): number {
+  const n = parseFloat(String(val));
+  return isNaN(n) ? 0 : n;
+}
 
 const BUSINESS_TYPES = [
   { value: "1", label: "Автопарк" },
@@ -63,7 +69,7 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
   }
 
   useEffect(() => {
-    setPage(0); // Сброс страницы при смене фильтров
+    setPage(0);
     fetchClients();
   }, [search, filterProfile, filterState, filterBusiness]);
 
@@ -186,7 +192,10 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
             </thead>
             <tbody>
               {clients.map((c) => {
-                const profile = profiles.find(p => p.profileId === c.profileId);
+                const profile = profiles.find(p => p.profileId === String(c.profileId));
+                const stateNum = Number(c.state);
+                const debtNum = safeNum(c.debt);
+                
                 return (
                   <tr key={c.userId} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
@@ -199,15 +208,15 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
                     </td>
                     <td className="px-4 py-3 text-slate-700">{profile?.name || "—"}</td>
                     <td className="px-4 py-3">
-                      {c.state === 1 && <span className="text-green-600">Активен</span>}
-                      {c.state === 0 && <span className="text-amber-600">Ожидает</span>}
-                      {c.state === -1 && <span className="text-red-600">Отклонен</span>}
-                      {c.state === 2 && <span className="text-slate-400">Удален</span>}
+                      {stateNum === 1 && <span className="text-green-600">Активен</span>}
+                      {stateNum === 0 && <span className="text-amber-600">Ожидает</span>}
+                      {stateNum === -1 && <span className="text-red-600">Отклонен</span>}
+                      {stateNum === 2 && <span className="text-slate-400">Удален</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-700 text-xs">{c.businessName || "—"}</td>
                     <td className="px-4 py-3 text-slate-700 text-xs">{c.city || "—"}</td>
-                    <td className={`px-4 py-3 font-medium ${Number(c.debt) > 0 ? "text-red-600" : "text-slate-500"}`}>
-                      {Number(c.debt || 0).toLocaleString("ru-RU")} ₽
+                    <td className={`px-4 py-3 font-medium ${debtNum > 0 ? "text-red-600" : "text-slate-500"}`}>
+                      {debtNum.toLocaleString("ru-RU")} ₽
                     </td>
                   </tr>
                 );
