@@ -51,10 +51,16 @@ async function getUsers(): Promise<User[]> {
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден в БД");
 
-  // Загружаем последних 1000 зарегистрированных клиентов
+  const dateStart = new Date();
+  dateStart.setDate(dateStart.getDate() - 30);
+  dateStart.setHours(0, 0, 0, 0);
+
   return abcpRequest<User[]>(
     "cp/users",
-    { limit: "1000", desc: "true" },
+    { 
+      dateRegistredStart: formatDate(dateStart),
+      limit: "1000" 
+    },
     {
       api_url: shop.api_url,
       api_login: shop.api_login,
@@ -75,7 +81,7 @@ type PageProps = {
 
 export default async function ClientsAnalyticsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const period = params?.period || "last6months"; // По умолчанию 6 месяцев для анализа оттока
+  const period = params?.period || "this_month";
   const from = params?.from;
   const to = params?.to;
 
@@ -84,7 +90,6 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
   let error: string | null = null;
 
   try {
-    // Загружаем параллельно заказы, пользователей и настройки
     const shop = await getShop();
     if (!shop) throw new Error("Магазин не найден в БД");
     
@@ -105,7 +110,6 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
       firstOrderDate: Date | null;
     }>();
 
-    // Группируем заказы по клиентам
     for (const order of orders) {
       const id = order.userId || "0";
       if (!id || id === "0") continue;
@@ -147,7 +151,6 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
       }
     }
 
-    // 1. Формируем Рейтинг токсичности
     const ratingClients = Array.from(clientMap.entries()).map(([id, data]) => {
       const cancelRate = data.totalItems > 0 ? (data.canceledCount / data.totalItems) * 100 : 0;
       let rating = "C";
@@ -181,22 +184,18 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
       return b.totalSum - a.totalSum;
     });
 
-    // 2. Анализ оттока (Уходящие и Снижение активности)
     const now = new Date();
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Уходящие VIP (заказывали много, но последний заказ был > 30 дней назад)
     const churnedVip = ratingClients
       .filter(c => c.totalSum > 30000 && c.lastOrderDate && c.lastOrderDate < thirtyDaysAgo)
       .sort((a, b) => b.totalSum - a.totalSum);
 
-    // Снижение активности (заказывали, но последний заказ был > 30 дней назад, выручка средняя)
     const decliningClients = ratingClients
       .filter(c => c.totalSum <= 30000 && c.lastOrderDate && c.lastOrderDate < thirtyDaysAgo)
       .sort((a, b) => b.totalSum - a.totalSum);
 
-    // 3. Новички без покупок (зарегистрировались > 7 дней назад, но заказов нет)
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -204,7 +203,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
       if (!u.registrationDate) return false;
       const regDate = new Date(u.registrationDate.replace(" ", "T"));
       return regDate < sevenDaysAgo && !clientMap.has(u.userId);
-    }).slice(0, 50); // Берем только 50 для отображения
+    }).slice(0, 50);
 
     return (
       <AppLayout>
@@ -256,7 +255,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 max-w-xs">{c.recommendation}</td>
-                                                <td className="px-4 py-3">
+                        <td className="px-4 py-3">
                           <ManageClientButton clientId={c.id} clientName={c.name} rating={c.rating} />
                         </td>
                       </tr>
@@ -294,7 +293,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
                           <td className="px-4 py-3 text-slate-900">{Math.round(c.totalSum).toLocaleString("ru-RU")} ₽</td>
                           <td className="px-4 py-3 text-red-600 text-xs">{c.lastOrderDate?.toLocaleDateString("ru-RU")}</td>
                           <td className="px-4 py-3">
-                            <CreateTaskButton clientId={c.id} clientName={c.name} />
+                            <ManageClientButton clientId={c.id} clientName={c.name} rating={c.rating} />
                           </td>
                         </tr>
                       ))}
@@ -330,7 +329,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
                           <td className="px-4 py-3 text-slate-900">{Math.round(c.totalSum).toLocaleString("ru-RU")} ₽</td>
                           <td className="px-4 py-3 text-amber-600 text-xs">{c.lastOrderDate?.toLocaleDateString("ru-RU")}</td>
                           <td className="px-4 py-3">
-                            <CreateTaskButton clientId={c.id} clientName={c.name} />
+                            <ManageClientButton clientId={c.id} clientName={c.name} rating={c.rating} />
                           </td>
                         </tr>
                       ))}
@@ -365,7 +364,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
                         <td className="px-4 py-3 font-medium text-slate-900 max-w-xs truncate">{getClientName(u, u.userId)}</td>
                         <td className="px-4 py-3 text-slate-500">{u.registrationDate}</td>
                         <td className="px-4 py-3">
-                          <CreateTaskButton clientId={u.userId} clientName={getClientName(u, u.userId)} />
+                          <ManageClientButton clientId={u.userId} clientName={getClientName(u, u.userId)} rating="C" />
                         </td>
                       </tr>
                     ))}
@@ -387,7 +386,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
               <h1 className="text-2xl font-bold text-slate-900">Аналитика клиентов</h1>
               <p className="mt-1 text-sm text-slate-500">Рейтинг, отток и снижение активности</p>
             </div>
-            <PeriodFilter currentPeriod={params?.period || "last6months"} currentFrom={from} currentTo={to} />
+            <PeriodFilter currentPeriod={params?.period || "this_month"} currentFrom={from} currentTo={to} />
           </div>
           <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             Ошибка: {e instanceof Error ? e.message : "Неизвестная ошибка"}
