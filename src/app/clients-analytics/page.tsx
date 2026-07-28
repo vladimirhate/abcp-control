@@ -3,7 +3,7 @@ import { getShop, getAlertsSettings } from "@/lib/shop";
 import { AppLayout } from "@/components/AppLayout";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { getRange } from "@/lib/dates";
-import { ManageClientButton } from "@/components/ManageClientButton";
+import { AnalyticsBulkTable } from "@/components/AnalyticsBulkTable";
 
 type OrderPosition = {
   isCanceled: string;
@@ -25,6 +25,11 @@ type User = {
   name: string;
   organizationName: string;
   registrationDate: string;
+};
+
+type Profile = {
+  profileId: string;
+  name: string;
 };
 
 async function getOrders(period: string, from?: string, to?: string): Promise<Order[]> {
@@ -69,6 +74,14 @@ async function getUsers(): Promise<User[]> {
   );
 }
 
+async function getProfiles(): Promise<Profile[]> {
+  const shop = await getShop();
+  if (!shop) throw new Error("Магазин не найден в БД");
+  return abcpRequest<Profile[]>("cp/users/profiles", {}, {
+    api_url: shop.api_url, api_login: shop.api_login, api_password_md5: shop.api_password_md5,
+  });
+}
+
 function getClientName(user: User | undefined, id: string, order?: Order): string {
   if (user) return user.organizationName || user.name || "Клиент " + id;
   if (order) return order.userFullName || order.userName || "Клиент " + id;
@@ -87,6 +100,7 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
 
   let orders: Order[] = [];
   let users: User[] = [];
+  let profiles: Profile[] = [];
   let error: string | null = null;
 
   try {
@@ -96,9 +110,10 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
     const settings = await getAlertsSettings(shop.id);
     const clientCancelCodes = settings?.client_cancel_statuses || [];
 
-    const results = await Promise.all([getOrders(period, from, to), getUsers()]);
+    const results = await Promise.all([getOrders(period, from, to), getUsers(), getProfiles()]);
     orders = results[0];
     users = results[1];
+    profiles = results[2];
 
     const clientMap = new Map<string, { 
       name: string; 
@@ -212,166 +227,60 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Аналитика клиентов</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Рейтинг токсичности, отток и снижение активности
+                Рейтинг токсичности, отток и массовое управление
               </p>
             </div>
             <PeriodFilter currentPeriod={period} currentFrom={from} currentTo={to} />
           </div>
 
-          {/* Блок 1: Рейтинг токсичности */}
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-6 py-4">
-              <h2 className="font-semibold text-slate-900">Рейтинг клиентов ({ratingClients.length})</h2>
-              <p className="text-xs text-slate-500 mt-1">Оценка на основе выручки и процента возвратов/отказов</p>
-            </div>
-            {ratingClients.length === 0 ? (
-              <div className="p-6 text-center text-slate-500">Нет данных за этот период.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-slate-500">
-                      <th className="px-4 py-3 font-medium">Рейтинг</th>
-                      <th className="px-4 py-3 font-medium">Клиент</th>
-                      <th className="px-4 py-3 font-medium">Выручка</th>
-                      <th className="px-4 py-3 font-medium">Возвраты</th>
-                      <th className="px-4 py-3 font-medium">Рекомендация</th>
-                      <th className="px-4 py-3 font-medium">Действие</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ratingClients.slice(0, 100).map((c) => (
-                      <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${c.ratingColor}`}>
-                            {c.rating}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-slate-900 max-w-xs truncate">{c.name}</td>
-                        <td className="px-4 py-3 text-slate-900 font-medium">{Math.round(c.totalSum).toLocaleString("ru-RU")} ₽</td>
-                        <td className="px-4 py-3">
-                          <span className={`font-medium ${c.cancelRate > 30 ? "text-red-600" : c.cancelRate > 15 ? "text-amber-600" : "text-green-700"}`}>
-                            {c.cancelRate.toFixed(1)}%
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 max-w-xs">{c.recommendation}</td>
-                        <td className="px-4 py-3">
-                          <ManageClientButton clientId={c.id} clientName={c.name} rating={c.rating} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          <div className="mt-6">
+            <AnalyticsBulkTable 
+              title="Рейтинг клиентов (Топ-100)" 
+              clients={ratingClients.slice(0, 100).map(c => ({ 
+                id: c.id, 
+                name: c.name, 
+                totalSum: c.totalSum, 
+                cancelRate: c.cancelRate 
+              }))} 
+              profiles={profiles}
+            />
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
-            {/* Блок 2: Уходящие VIP */}
-            <div className="rounded-xl border border-red-200 bg-white shadow-sm">
-              <div className="border-b border-red-200 bg-red-50 px-6 py-4">
-                <h2 className="font-semibold text-red-800">Уходящие VIP-клиенты ({churnedVip.length})</h2>
-                <p className="text-xs text-red-700 mt-1">Заказывали много, но не делали заказы &gt; 30 дней</p>
-              </div>
-              {churnedVip.length === 0 ? (
-                <div className="p-6 text-center text-slate-500">Оттока VIP нет.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-left text-slate-500">
-                        <th className="px-4 py-3 font-medium">Клиент</th>
-                        <th className="px-4 py-3 font-medium">Выручка</th>
-                        <th className="px-4 py-3 font-medium">Посл. заказ</th>
-                        <th className="px-4 py-3 font-medium">Действие</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {churnedVip.slice(0, 20).map((c) => (
-                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-900 max-w-[150px] truncate">{c.name}</td>
-                          <td className="px-4 py-3 text-slate-900">{Math.round(c.totalSum).toLocaleString("ru-RU")} ₽</td>
-                          <td className="px-4 py-3 text-red-600 text-xs">{c.lastOrderDate?.toLocaleDateString("ru-RU")}</td>
-                          <td className="px-4 py-3">
-                            <ManageClientButton clientId={c.id} clientName={c.name} rating={c.rating} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Блок 3: Снижение активности */}
-            <div className="rounded-xl border border-amber-200 bg-white shadow-sm">
-              <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
-                <h2 className="font-semibold text-amber-800">Снижение активности ({decliningClients.length})</h2>
-                <p className="text-xs text-amber-700 mt-1">Перестали заказывать &gt; 30 дней назад</p>
-              </div>
-              {decliningClients.length === 0 ? (
-                <div className="p-6 text-center text-slate-500">Все клиенты активны.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-left text-slate-500">
-                        <th className="px-4 py-3 font-medium">Клиент</th>
-                        <th className="px-4 py-3 font-medium">Выручка</th>
-                        <th className="px-4 py-3 font-medium">Посл. заказ</th>
-                        <th className="px-4 py-3 font-medium">Действие</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {decliningClients.slice(0, 20).map((c) => (
-                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-900 max-w-[150px] truncate">{c.name}</td>
-                          <td className="px-4 py-3 text-slate-900">{Math.round(c.totalSum).toLocaleString("ru-RU")} ₽</td>
-                          <td className="px-4 py-3 text-amber-600 text-xs">{c.lastOrderDate?.toLocaleDateString("ru-RU")}</td>
-                          <td className="px-4 py-3">
-                            <ManageClientButton clientId={c.id} clientName={c.name} rating={c.rating} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            <AnalyticsBulkTable 
+              title="Уходящие VIP-клиенты" 
+              clients={churnedVip.slice(0, 20).map(c => ({ 
+                id: c.id, 
+                name: c.name, 
+                totalSum: c.totalSum, 
+                lastOrderDate: c.lastOrderDate?.toLocaleDateString("ru-RU") 
+              }))} 
+              profiles={profiles}
+              color="red"
+            />
+            
+            <AnalyticsBulkTable 
+              title="Снижение активности" 
+              clients={decliningClients.slice(0, 20).map(c => ({ 
+                id: c.id, 
+                name: c.name, 
+                totalSum: c.totalSum, 
+                lastOrderDate: c.lastOrderDate?.toLocaleDateString("ru-RU") 
+              }))} 
+              profiles={profiles}
+              color="amber"
+            />
           </div>
 
-          {/* Блок 4: Новички без покупок */}
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-6 py-4">
-              <h2 className="font-semibold text-slate-900">Новички без покупок ({newWithoutOrders.length})</h2>
-              <p className="text-xs text-slate-500 mt-1">Зарегистрировались &gt; 7 дней назад, но так ничего и не заказали</p>
-            </div>
-            {newWithoutOrders.length === 0 ? (
-              <div className="p-6 text-center text-slate-500">Таких клиентов нет.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-slate-500">
-                      <th className="px-4 py-3 font-medium">Клиент</th>
-                      <th className="px-4 py-3 font-medium">Дата регистрации</th>
-                      <th className="px-4 py-3 font-medium">Действие</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {newWithoutOrders.map((u) => (
-                      <tr key={u.userId} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-900 max-w-xs truncate">{getClientName(u, u.userId)}</td>
-                        <td className="px-4 py-3 text-slate-500">{u.registrationDate}</td>
-                        <td className="px-4 py-3">
-                          <ManageClientButton clientId={u.userId} clientName={getClientName(u, u.userId)} rating="C" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          <div className="mt-6">
+            <AnalyticsBulkTable 
+              title="Новички без покупок" 
+              clients={newWithoutOrders.map(u => ({ 
+                id: u.userId, 
+                name: getClientName(u, u.userId) 
+              }))} 
+              profiles={profiles}
+            />
           </div>
 
         </div>
