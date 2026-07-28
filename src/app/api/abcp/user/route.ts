@@ -14,27 +14,36 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId, managerComment, inStopList } = body;
 
-    // Формируем параметры для ABCP
+    // В ABCP логин и пароль передаются в URL, а остальные параметры в теле
+    const url = new URL(`${shop.api_url}/cp/user`);
+    url.searchParams.append("userlogin", shop.api_login);
+    url.searchParams.append("userpsw", shop.api_password_md5);
+
     const params = new URLSearchParams();
-    params.append("userlogin", shop.api_login);
-    params.append("userpsw", shop.api_password_md5);
-    params.append("userId", userId);
-    
+    params.append("userId", String(userId));
     if (managerComment !== undefined) params.append("managerComment", managerComment);
     if (inStopList !== undefined) params.append("inStopList", inStopList ? "1" : "0");
 
-    const response = await fetch(`${shop.api_url}/cp/user`, {
+    const response = await fetch(url.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString()
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ошибка API ABCP: ${text}`);
+    // Читаем ответ как текст, чтобы не упасть, если вернулся HTML
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      // Если это не JSON, значит ABCP вернул ошибку (например 404 или 500)
+      throw new Error(`Сервер ABCP вернул ошибку (статус ${response.status}). Проверьте права API-администратора.`);
     }
 
-    const data = await response.json();
+    if (data && data.errorCode) {
+      throw new Error(`Ошибка ABCP: ${data.errorMessage || 'Неизвестная ошибка'}`);
+    }
+
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -10,7 +10,7 @@ export function ManageClientButton({ clientId, clientName, rating }: { clientId:
   const [comment, setComment] = useState("");
   const [stopList, setStopList] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -27,16 +27,26 @@ export function ManageClientButton({ clientId, clientName, rating }: { clientId:
           inStopList: stopList
         }),
       });
+
+      // Проверяем, что ответ от нашего сервера валидный
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Ошибка сервера" }));
+        throw new Error(errData.error || "Ошибка сервера");
+      }
+
       const data = await res.json();
       if (data.success) {
-        setMessage("Данные клиента обновлены в ABCP!");
+        setMessage({ type: "success", text: "Данные клиента обновлены в ABCP!" });
         setComment("");
         setStopList(false);
       } else {
-        throw new Error(data.error || "Ошибка");
+        throw new Error(data.error || "Неизвестная ошибка");
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка сохранения");
+      setMessage({ 
+        type: "error", 
+        text: err instanceof Error ? err.message : "Ошибка сохранения" 
+      });
     } finally {
       setSaving(false);
     }
@@ -108,7 +118,11 @@ export function ManageClientButton({ clientId, clientName, rating }: { clientId:
                 </div>
               )}
 
-              {message && <p className="text-xs text-green-600">{message}</p>}
+              {message && (
+                <p className={`text-xs font-medium ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {message.text}
+                </p>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setIsOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
