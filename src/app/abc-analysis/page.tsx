@@ -146,12 +146,18 @@ export default async function AbcAnalysisPage({ searchParams }: PageProps) {
     const cancelRate = a.qty > 0 ? (a.canceledQty / a.qty) * 100 : 0;
     let recommendation = "";
     
-    if (category === "A" && cancelRate < 10) {
+        if (category === "A" && cancelRate < 10) {
       recommendation = "🟢 Золотой запас. Всегда должен быть в наличии.";
     } else if (category === "A" && cancelRate > 20) {
       recommendation = "🔴 Приносит деньги, но много брака. Найти другого поставщика!";
+    } else if (category === "A") {
+      recommendation = "🟡 Топ-товар, но есть возвраты. Контролировать качество.";
     } else if (category === "B" && cancelRate > 30) {
       recommendation = "🟠 Высокий процент возвратов. Пересмотреть закупку.";
+    } else if (category === "B" && cancelRate < 10) {
+      recommendation = "🟢 Стабильный продавец. Держать в наличии.";
+    } else if (category === "B") {
+      recommendation = "🟡 Средний продавец. Контролировать остатки.";
     } else if (category === "C" && a.qty <= 2) {
       recommendation = "🔵 Редкий товар. Закупать только под заказ.";
     } else if (category === "C") {
