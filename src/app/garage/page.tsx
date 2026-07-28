@@ -47,12 +47,16 @@ export default async function GaragePage() {
       })
     ]);
 
-        // Проверяем, что гараж — это массив
-    if (Array.isArray(carsData)) {
+         // API возвращает объект, где ключ - userId, а значение - массив машин
+    if (typeof carsData === 'object' && carsData !== null) {
+      // Если это объект, вытаскиваем все массивы машин в один плоский список
+      const allCars = Object.values(carsData).flat();
+      cars = allCars as Car[];
+    } else if (Array.isArray(carsData)) {
+      // На всякий случай оставим проверку массива
       cars = carsData as Car[];
     } else {
-      // Если API вернул ошибку или другой формат
-      throw new Error("Сырой ответ API: " + JSON.stringify(carsData).slice(0, 500));
+      throw new Error("Неверный формат данных от API гаража");
     }
 
     // Собираем карту клиентов
