@@ -62,21 +62,24 @@ async function getManagers(): Promise<Manager[]> {
   );
 }
 
-async function getAdjustments(month: string): Promise<Record<string, number>> {
+async function getAdjustments(month: string): Promise<Record<string, { amount: number; reason: string }>> {
   const shop = await getShop();
   if (!shop) return {};
 
   const { data, error } = await supabaseAdmin
     .from("salary_adjustments")
-    .select("manager_id, amount")
+    .select("manager_id, amount, reason")
     .eq("shop_id", shop.id)
     .eq("month", month);
 
   if (error || !data) return {};
 
-  const map: Record<string, number> = {};
+  const map: Record<string, { amount: number; reason: string }> = {};
   data.forEach((item: any) => {
-    map[item.manager_id] = Number(item.amount);
+    map[item.manager_id] = { 
+      amount: Number(item.amount), 
+      reason: item.reason || "" 
+    };
   });
   return map;
 }
@@ -93,7 +96,7 @@ export default async function SalaryPage() {
   let orders: Order[] = [];
   let managers: Manager[] = [];
   let salaryRule: SalaryRules | null = null;
-  let adjustments: Record<string, number> = {};
+  let adjustments: Record<string, { amount: number; reason: string }> = {};
   let error: string | null = null;
 
   const now = new Date();
@@ -167,7 +170,7 @@ export default async function SalaryPage() {
     }
   }
 
-  const calculations: (SalaryCalculation & { adjustment: number; finalTotal: number })[] = [];
+  const calculations: (SalaryCalculation & { adjustment: number; adjustmentReason: string; finalTotal: number })[] = [];
 
   for (const [managerId, data] of managerData) {
     const managerName = getManagerName(managerId, managers);
@@ -181,10 +184,10 @@ export default async function SalaryPage() {
       salaryRule
     );
     
-    const adj = adjustments[managerId] || 0;
-    const finalTotal = calc.total + adj;
+    const adjData = adjustments[managerId] || { amount: 0, reason: "" };
+    const finalTotal = calc.total + adjData.amount;
 
-    calculations.push({ ...calc, adjustment: adj, finalTotal });
+    calculations.push({ ...calc, adjustment: adjData.amount, adjustmentReason: adjData.reason, finalTotal });
   }
 
   calculations.sort((a, b) => b.finalTotal - a.finalTotal);
@@ -273,7 +276,7 @@ export default async function SalaryPage() {
             <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-6 py-4">
                 <h2 className="font-semibold text-slate-900">Расчёт по менеджерам</h2>
-                <p className="text-xs text-slate-500 mt-1">Корректировки (штрафы/бонусы) сохраняются автоматически на текущий месяц</p>
+                <p className="text-xs text-slate-500 mt-1">Корректировки (штрафы/больничные/премии) сохраняются автоматически на текущий месяц</p>
               </div>
 
               {calculations.length === 0 ? (
@@ -310,6 +313,7 @@ export default async function SalaryPage() {
                               managerId={c.managerId} 
                               month={currentMonth} 
                               initialAmount={c.adjustment} 
+                              initialReason={c.adjustmentReason} 
                             />
                           </td>
                           <td className="px-4 py-3 text-lg font-bold text-slate-900">

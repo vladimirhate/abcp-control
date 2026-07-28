@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-export function AdjustmentInput({ managerId, month, initialAmount }: { managerId: string; month: string; initialAmount: number }) {
+export function AdjustmentInput({ managerId, month, initialAmount, initialReason }: { managerId: string; month: string; initialAmount: number; initialReason?: string }) {
   const [amount, setAmount] = useState(String(initialAmount || 0));
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(initialReason || "");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "saved">("idle");
 
@@ -22,13 +22,14 @@ export function AdjustmentInput({ managerId, month, initialAmount }: { managerId
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 w-40">
       <div className="flex items-center gap-1">
         <input
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500"
+          placeholder="0"
         />
         <button 
           onClick={save} 
@@ -38,6 +39,13 @@ export function AdjustmentInput({ managerId, month, initialAmount }: { managerId
           {saving ? "..." : "OK"}
         </button>
       </div>
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs outline-none focus:border-blue-500"
+        placeholder="Причина (напр. Больничный)"
+      />
       {status === "saved" && <span className="text-[10px] text-green-600">Сохранено!</span>}
     </div>
   );

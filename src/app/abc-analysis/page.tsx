@@ -155,9 +155,9 @@ export default async function AbcAnalysisPage({ searchParams }: PageProps) {
     } else if (category === "B" && cancelRate > 30) {
       recommendation = "🟠 Высокий процент возвратов. Пересмотреть закупку.";
     } else if (category === "B" && cancelRate < 10) {
-      recommendation = "🟢 Стабильный продавец. Держать в наличии.";
+      recommendation = "🟢 Стабильный товар. Держать в наличии.";
     } else if (category === "B") {
-      recommendation = "🟡 Средний продавец. Контролировать остатки.";
+      recommendation = "🟡 Средний товар. Контролировать остатки.";
     } else if (category === "C" && a.qty <= 2) {
       recommendation = "🔵 Редкий товар. Закупать только под заказ.";
     } else if (category === "C") {
