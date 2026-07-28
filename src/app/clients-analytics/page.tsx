@@ -234,13 +234,14 @@ export default async function ClientsAnalyticsPage({ searchParams }: PageProps) 
           </div>
 
           <div className="mt-6">
-            <AnalyticsBulkTable 
+                        <AnalyticsBulkTable 
               title="Рейтинг клиентов (Топ-100)" 
               clients={ratingClients.slice(0, 100).map(c => ({ 
                 id: c.id, 
                 name: c.name, 
                 totalSum: c.totalSum, 
-                cancelRate: c.cancelRate 
+                cancelRate: c.cancelRate,
+                lastOrderDate: c.lastOrderDate?.toLocaleDateString("ru-RU")
               }))} 
               profiles={profiles}
             />
