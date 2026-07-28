@@ -2,7 +2,9 @@ import Link from "next/link";
 import { abcpRequest, formatDate, calcOrderMargin, OrderPosition } from "@/lib/abcp";
 import { calculateSalary, SalaryCalculation, SalaryRules } from "@/lib/salary";
 import { getShop, getSalaryRule } from "@/lib/shop";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { AppLayout } from "@/components/AppLayout";
+import { AdjustmentInput } from "@/components/AdjustmentInput";
 
 type Order = {
   number: string;
@@ -60,6 +62,25 @@ async function getManagers(): Promise<Manager[]> {
   );
 }
 
+async function getAdjustments(month: string): Promise<Record<string, number>> {
+  const shop = await getShop();
+  if (!shop) return {};
+
+  const { data, error } = await supabaseAdmin
+    .from("salary_adjustments")
+    .select("manager_id, amount")
+    .eq("shop_id", shop.id)
+    .eq("month", month);
+
+  if (error || !data) return {};
+
+  const map: Record<string, number> = {};
+  data.forEach((item: any) => {
+    map[item.manager_id] = Number(item.amount);
+  });
+  return map;
+}
+
 function getManagerName(managerId: string, managers: Manager[]): string {
   if (!managerId || managerId === "0") return "Без менеджера";
   const manager = managers.find((m) => m.id === managerId);
@@ -72,7 +93,12 @@ export default async function SalaryPage() {
   let orders: Order[] = [];
   let managers: Manager[] = [];
   let salaryRule: SalaryRules | null = null;
+  let adjustments: Record<string, number> = {};
   let error: string | null = null;
+
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthName = now.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 
   try {
     const shop = await getShop();
@@ -81,11 +107,13 @@ export default async function SalaryPage() {
     const results = await Promise.all([
       getOrders(), 
       getManagers(), 
-      getSalaryRule(shop.id)
+      getSalaryRule(shop.id),
+      getAdjustments(currentMonth)
     ]);
     
     orders = results[0];
     managers = results[1];
+    adjustments = results[3];
     const rule = results[2];
 
     if (rule) {
@@ -139,7 +167,7 @@ export default async function SalaryPage() {
     }
   }
 
-  const calculations: SalaryCalculation[] = [];
+  const calculations: (SalaryCalculation & { adjustment: number; finalTotal: number })[] = [];
 
   for (const [managerId, data] of managerData) {
     const managerName = getManagerName(managerId, managers);
@@ -152,20 +180,18 @@ export default async function SalaryPage() {
       data.paidRevenue,
       salaryRule
     );
-    calculations.push(calc);
+    
+    const adj = adjustments[managerId] || 0;
+    const finalTotal = calc.total + adj;
+
+    calculations.push({ ...calc, adjustment: adj, finalTotal });
   }
 
-  calculations.sort((a, b) => b.total - a.total);
+  calculations.sort((a, b) => b.finalTotal - a.finalTotal);
 
-  const totalFot = calculations.reduce((sum, c) => sum + c.total, 0);
+  const totalFot = calculations.reduce((sum, c) => sum + c.finalTotal, 0);
   const totalRevenue = calculations.reduce((sum, c) => sum + c.revenue, 0);
   const totalMargin = calculations.reduce((sum, c) => sum + c.margin, 0);
-
-  const now = new Date();
-  const monthName = now.toLocaleDateString("ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
 
   return (
     <AppLayout>
@@ -183,7 +209,7 @@ export default async function SalaryPage() {
           <>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-sm text-slate-500">ФОТ</div>
+                <div className="text-sm text-slate-500">ФОТ (Итог к выдаче)</div>
                 <div className="mt-2 text-3xl font-bold text-slate-900">
                   {Math.round(totalFot).toLocaleString("ru-RU")} ₽
                 </div>
@@ -247,6 +273,7 @@ export default async function SalaryPage() {
             <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-6 py-4">
                 <h2 className="font-semibold text-slate-900">Расчёт по менеджерам</h2>
+                <p className="text-xs text-slate-500 mt-1">Корректировки (штрафы/бонусы) сохраняются автоматически на текущий месяц</p>
               </div>
 
               {calculations.length === 0 ? (
@@ -259,15 +286,9 @@ export default async function SalaryPage() {
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-slate-500">
                         <th className="px-4 py-3 font-medium">Менеджер</th>
-                        <th className="px-4 py-3 font-medium">Заказов</th>
-                        <th className="px-4 py-3 font-medium">Выручка</th>
-                        <th className="px-4 py-3 font-medium">Маржа</th>
-                        <th className="px-4 py-3 font-medium">Оклад</th>
-                        <th className="px-4 py-3 font-medium">% выручки</th>
-                        <th className="px-4 py-3 font-medium">% маржи</th>
-                        <th className="px-4 py-3 font-medium">% оплач.</th>
-                        <th className="px-4 py-3 font-medium">План</th>
-                        <th className="px-4 py-3 font-medium">Итого</th>
+                        <th className="px-4 py-3 font-medium">Авто-расчет</th>
+                        <th className="px-4 py-3 font-medium">Корректировка (±)</th>
+                        <th className="px-4 py-3 font-medium">Итого к выдаче</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -277,44 +298,29 @@ export default async function SalaryPage() {
                             <Link href={"/manager/" + c.managerId} className="text-slate-900 hover:text-blue-600">
                               {c.managerName}
                             </Link>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">{c.ordersCount}</td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {c.revenue.toLocaleString("ru-RU")} ₽
-                          </td>
-                          <td className="px-4 py-3 font-medium text-green-700">
-                            {Math.round(c.margin).toLocaleString("ru-RU")} ₽
+                            <div className="text-xs text-slate-400 mt-1">
+                              {c.ordersCount} зак. | Маржа: {Math.round(c.margin).toLocaleString("ru-RU")} ₽
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-slate-700">
-                            {c.baseSalary.toLocaleString("ru-RU")} ₽
-                          </td>
-                          <td className="px-4 py-3 text-green-700">
-                            +{Math.round(c.revenueBonus).toLocaleString("ru-RU")} ₽
-                          </td>
-                          <td className="px-4 py-3 text-green-700">
-                            +{Math.round(c.marginBonus).toLocaleString("ru-RU")} ₽
-                          </td>
-                          <td className="px-4 py-3 text-green-700">
-                            +{Math.round(c.paidRevenueBonus).toLocaleString("ru-RU")} ₽
+                            {Math.round(c.total).toLocaleString("ru-RU")} ₽
                           </td>
                           <td className="px-4 py-3">
-                            {c.planCompleted ? (
-                              <span className="text-green-700 font-medium">
-                                +{c.planBonus.toLocaleString("ru-RU")} ₽
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
+                            <AdjustmentInput 
+                              managerId={c.managerId} 
+                              month={currentMonth} 
+                              initialAmount={c.adjustment} 
+                            />
                           </td>
                           <td className="px-4 py-3 text-lg font-bold text-slate-900">
-                            {Math.round(c.total).toLocaleString("ru-RU")} ₽
+                            {Math.round(c.finalTotal).toLocaleString("ru-RU")} ₽
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-slate-200 bg-slate-50">
-                        <td colSpan={9} className="px-4 py-4 font-semibold text-slate-900">
+                        <td colSpan={3} className="px-4 py-4 font-semibold text-slate-900">
                           ИТОГО ФОТ
                         </td>
                         <td className="px-4 py-4 text-xl font-bold text-blue-600">
