@@ -16,7 +16,7 @@ export async function fetchStatusHistory(positionIds: string[]): Promise<StatusH
 
   const historyMap: StatusHistory = {};
   
-  console.log(`[History] Начинаем загрузку истории для ${positionIds.length} позиций...`);
+  console.log(`[HISTORY DEBUG] Запрашиваем историю для ${positionIds.length} позиций...`);
   
   const chunkSize = 100;
   for (let i = 0; i < positionIds.length; i += chunkSize) {
@@ -30,29 +30,41 @@ export async function fetchStatusHistory(positionIds: string[]): Promise<StatusH
 
     try {
       const response = await fetch(url.toString(), { cache: "no-store" });
+      console.log(`[HISTORY DEBUG] Запрос батча. Статус: ${response.status}`);
       
-      if (!response.ok) {
-        continue;
-      }
+      if (!response.ok) continue;
 
       const data = await response.json();
+      console.log(`[HISTORY DEBUG] Структура ответа:`, Object.keys(data));
       
       if (data && data.positions) {
-        // API возвращает массив или объект с числовыми ключами (индексами)
-        const positionsArray = Array.isArray(data.positions) ? data.positions : Object.values(data.positions);
-        
-                positionsArray.forEach((history: any, index: number) => {
-          const posId = chunk[index]; // Сопоставляем индекс с ID позиции из нашего запроса
-          if (posId && history) {
-            historyMap[posId] = history as HistoryEntry[];
+        // Если это массив
+        if (Array.isArray(data.positions)) {
+          console.log(`[HISTORY DEBUG] data.positions - это МАССИВ, длина: ${data.positions.length}`);
+          data.positions.forEach((history: any, index: number) => {
+            const posId = chunk[index];
+            if (posId && history) {
+              historyMap[posId] = history as HistoryEntry[];
+            }
+          });
+        } 
+        // Если это объект
+        else {
+          console.log(`[HISTORY DEBUG] data.positions - это ОБЪЕКТ, ключи:`, Object.keys(data.positions).slice(0, 5));
+          for (const [posId, history] of Object.entries(data.positions)) {
+            if (history) {
+              historyMap[posId] = history as HistoryEntry[];
+            }
           }
-        });
+        }
+      } else {
+        console.log(`[HISTORY DEBUG] В ответе нет узла positions! Вот ответ:`, JSON.stringify(data).slice(0, 200));
       }
     } catch (e) {
-      console.error("[History] Ошибка загрузки истории статусов:", e);
+      console.error("[HISTORY DEBUG] Ошибка:", e);
     }
   }
   
-  console.log(`[History] Успешно загружена история для ${Object.keys(historyMap).length} позиций.`);
+  console.log(`[HISTORY DEBUG] Успешно извлечена история для ${Object.keys(historyMap).length} позиций.`);
   return historyMap;
 }
