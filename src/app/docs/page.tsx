@@ -117,7 +117,7 @@ export default function DocsPage() {
 
           {/* Настройки */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Важность настроек (Сервис -> Алерты)</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Важность настроек (Сервис — Алерты)</h2>
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               <p>Для того чтобы аналитика отказов, рейтинг клиентов и расчет зарплаты работали максимально точно, владельцу необходимо один раз настроить статусы в разделе <strong>"Алерты"</strong>:</p>
               <ul className="list-disc pl-5 space-y-1">
