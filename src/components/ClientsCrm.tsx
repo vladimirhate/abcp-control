@@ -192,7 +192,7 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
             </thead>
             <tbody>
               {clients.map((c) => {
-                const profile = profiles.find(p => p.profileId === String(c.profileId));
+                const profile = profiles.find(p => String(p.profileId) === String(c.profileId));
                 const stateNum = Number(c.state);
                 const debtNum = safeNum(c.debt);
                 
