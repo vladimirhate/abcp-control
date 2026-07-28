@@ -21,6 +21,7 @@ import {
   BookOpen,
   LogOut,
   CheckSquare,
+  CreditCard,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -62,6 +63,7 @@ const menu: MenuSection[] = [
       { href: "/suppliers-health", label: "Здоровье прайсов", icon: HeartPulse },
       { href: "/lost-margin", label: "Аудит маржи", icon: AlertTriangle },
       { href: "/cancellations", label: "Аналитика отмен", icon: XCircle },
+      { href: "/payments", label: "Аналитика оплат", icon: CreditCard },
       { href: "/finance", label: "Финансы", icon: Wallet },
     ],
   },
