@@ -17,8 +17,10 @@ type Order = {
 
 type Manager = {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  surname?: string;
   email: string;
 };
 
@@ -52,9 +54,10 @@ async function getManagers(): Promise<Manager[]> {
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден в БД");
 
+  // withDeleted: "1" - запрашиваем всех, включая удаленных
   return abcpRequest<Manager[]>(
     "cp/managers",
-    {},
+    { withDeleted: "1" },
     {
       api_url: shop.api_url,
       api_login: shop.api_login,
@@ -85,7 +88,7 @@ async function getAdjustments(month: string): Promise<Record<string, { amount: n
   return map;
 }
 
-function getManagerName(managerId: string, managers: any[]): string {
+function getManagerName(managerId: string, managers: Manager[]): string {
   if (!managerId || managerId === "0") return "Без менеджера";
   const manager = managers.find((m) => String(m.id) === String(managerId));
   if (!manager) return "ID: " + managerId;
@@ -135,18 +138,22 @@ export default async function SalaryPage() {
         planBonus: Number(rule.plan_bonus),
       };
       
-      // Получаем метод расчета и статусы "Выдано"
       const calcMethod = rule.calc_method || "all";
       const deliveredStatuses = rule.delivered_statuses || [];
 
+      // ВАЖНО: Инициализируем карту данных всеми менеджерами (с нулями)
       const managerData = new Map<string, { ordersCount: number; revenue: number; margin: number; paidRevenue: number }>();
+      for (const mgr of managers) {
+        if (String(mgr.id) !== "0") {
+          managerData.set(String(mgr.id), { ordersCount: 0, revenue: 0, margin: 0, paidRevenue: 0 });
+        }
+      }
 
-      // Перебираем заказы с учетом метода расчета
+      // Перебираем заказы и приплюсовываем к существующим менеджерам
       for (const order of orders) {
-        const id = order.managerId || "0";
+        const id = String(order.managerId || "0");
         if (id === "0") continue;
 
-        // Если метод "По оплаченным" — пропускаем заказы с долгом
         if (calcMethod === "paid" && Number(order.debt || 0) > 0) {
           continue;
         }
@@ -157,10 +164,8 @@ export default async function SalaryPage() {
 
         if (order.positions) {
           for (const pos of order.positions) {
-            // Пропускаем отмененные
             if (pos.isCanceled === "1" || pos.isCanceled === "2") continue;
 
-            // Если метод "По выданным" — считаем только позиции с нужным статусом
             if (calcMethod === "delivered" && !deliveredStatuses.includes(Number(pos.statusCode))) {
               continue;
             }
@@ -175,10 +180,8 @@ export default async function SalaryPage() {
           }
         }
 
-        // Если метод "По всем" — берем сумму заказа целиком (если нет позиций)
         if (calcMethod === "all" && !hasValidPositions) {
           orderRevenue = Number(order.sum || 0);
-          // Маржу для "all" считаем через функцию (если позиции есть, они уже посчитались выше)
           if (order.positions && order.positions.length > 0) {
              orderMargin = calcOrderMargin(order.positions);
           }
@@ -193,6 +196,7 @@ export default async function SalaryPage() {
           existing.margin += orderMargin;
           existing.paidRevenue += paidSum;
         } else {
+          // Если заказ висит на менеджере, которого нет в списке (редкий случай)
           managerData.set(id, {
             ordersCount: 1,
             revenue: orderRevenue,
@@ -307,7 +311,7 @@ export default async function SalaryPage() {
 
               {calculations.length === 0 ? (
                 <div className="p-6 text-center text-slate-500">
-                  Нет данных для расчёта. У менеджеров нет заказов за этот месяц.
+                  Нет данных для расчёта.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -372,7 +376,6 @@ export default async function SalaryPage() {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
   }
 
-  // Если нет правил или произошла ошибка
   return (
     <AppLayout>
       <div className="mx-auto max-w-7xl">
