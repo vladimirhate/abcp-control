@@ -106,11 +106,16 @@ async function getManagers(): Promise<Manager[]> {
   );
 }
 
-function getManagerName(managerId: string, managers: Manager[]): string {
+function getManagerName(managerId: string, managers: any[]): string {
   if (!managerId || managerId === "0") return "Без менеджера";
-  const manager = managers.find((m) => m.id === managerId);
+  const manager = managers.find((m) => String(m.id) === String(managerId));
   if (!manager) return "ID: " + managerId;
-  const fullName = (manager.firstName + " " + manager.lastName).trim();
+  
+  // На случай, если ABCP возвращает name/surname вместо firstName/lastName
+  const first = manager.firstName || manager.name || "";
+  const last = manager.lastName || manager.surname || "";
+  const fullName = `${first} ${last}`.trim();
+  
   return fullName || manager.email || "ID: " + managerId;
 }
 
