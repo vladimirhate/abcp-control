@@ -81,6 +81,7 @@ export default async function ManagersPage({ searchParams }: PageProps) {
   let orders: Order[] = [];
   let managers: Manager[] = [];
   let error: string | null = null;
+  let debugHistorySample: any = null;
 
   try {
     const results = await Promise.all([getOrders(period, from, to), getManagers()]);
@@ -90,18 +91,19 @@ export default async function ManagersPage({ searchParams }: PageProps) {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
   }
 
-  // Получаем ID всех позиций всех заказов
   const allPositionIds = orders.flatMap(o => o.positions?.map(p => p.id) || []);
-  
-  // Запрашиваем историю статусов
   const history = error ? {} : await fetchStatusHistory(allPositionIds);
 
-  // Статистика по менеджерам (ключ - ID менеджера)
-  const managerStats = new Map<string, { 
-    totalReactionHours: number; 
-    ordersCount: number; 
-    isOther: boolean;
-  }>();
+  // Берем первый ID позиции для образца
+  const samplePosId = allPositionIds[0];
+  if (samplePosId) {
+    debugHistorySample = {
+      posId: samplePosId,
+      historyEntry: history[samplePosId]
+    };
+  }
+
+  const managerStats = new Map<string, { totalReactionHours: number; ordersCount: number; isOther: boolean }>();
 
   let debugTotalOrders = 0;
   let debugProcessedOrders = 0;
@@ -114,17 +116,15 @@ export default async function ManagersPage({ searchParams }: PageProps) {
     let earliestStatusChange: Date | null = null;
     let reactingManagerId: string | null = null;
 
-    // Ищем самую первую смену статуса среди всех позиций заказа
     for (const pos of order.positions) {
       const posHistory = history[pos.id];
-      if (posHistory && posHistory.length > 0) {
+      if (posHistory && Array.isArray(posHistory) && posHistory.length > 0) {
         const sortedHist = [...posHistory].sort((a, b) => a.datetime.localeCompare(b.datetime));
         const firstChange = new Date(sortedHist[0].datetime.replace(" ", "T"));
         
         if (!isNaN(firstChange.getTime())) {
           if (!earliestStatusChange || firstChange < earliestStatusChange) {
             earliestStatusChange = firstChange;
-            // Берем ID менеджера из записи истории!
             reactingManagerId = sortedHist[0].managerId;
           }
         }
@@ -140,8 +140,6 @@ export default async function ManagersPage({ searchParams }: PageProps) {
 
         if (diffHours > 0 && diffHours < 168) {
           debugProcessedOrders++;
-          
-          // Проверяем, является ли автор изменения менеджером по заказу
           const isOther = reactingManagerId !== order.managerId;
           
           const existing = managerStats.get(reactingManagerId);
@@ -149,11 +147,7 @@ export default async function ManagersPage({ searchParams }: PageProps) {
             existing.totalReactionHours += diffHours;
             existing.ordersCount += 1;
           } else {
-            managerStats.set(reactingManagerId, { 
-              totalReactionHours: diffHours, 
-              ordersCount: 1,
-              isOther
-            });
+            managerStats.set(reactingManagerId, { totalReactionHours: diffHours, ordersCount: 1, isOther });
           }
         }
       }
@@ -184,10 +178,18 @@ export default async function ManagersPage({ searchParams }: PageProps) {
         </div>
 
         {/* Блок отладки */}
-        <div className="mt-4 rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
-          Всего заказов: {debugTotalOrders} | 
-          Нет истории статусов: {debugNoHistory} | 
-          Успешно посчитано: {debugProcessedOrders}
+        <div className="mt-4 rounded-lg bg-slate-100 p-3 text-xs text-slate-600 space-y-2">
+          <div>
+            Всего заказов: {debugTotalOrders} | Нет истории: {debugNoHistory} | Успешно посчитано: {debugProcessedOrders}
+          </div>
+          {debugHistorySample && (
+            <div>
+              <p className="font-bold">Пример истории для позиции {debugHistorySample.posId}:</p>
+              <pre className="mt-1 max-h-40 overflow-auto bg-white p-2 rounded border border-slate-300">
+                {JSON.stringify(debugHistorySample.historyEntry, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
 
         {error ? (
@@ -214,13 +216,9 @@ export default async function ManagersPage({ searchParams }: PageProps) {
                     {stats.map((s) => (
                       <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-4 py-3 font-medium text-slate-900">
-                          <Link href={"/manager/" + s.id} className="hover:text-blue-600">
-                            {s.name}
-                          </Link>
+                          <Link href={"/manager/" + s.id} className="hover:text-blue-600">{s.name}</Link>
                           {s.isOther && (
-                            <span className="ml-2 inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
-                              Другой менеджер
-                            </span>
+                            <span className="ml-2 inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">Другой менеджер</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-slate-700">{s.ordersCount}</td>
