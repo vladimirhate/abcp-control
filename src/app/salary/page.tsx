@@ -10,6 +10,7 @@ type Order = {
   number: string;
   sum: number;
   paid: boolean;
+  debt: number;
   managerId: string;
   positions?: OrderPosition[];
 };
@@ -117,7 +118,7 @@ export default async function SalaryPage() {
     orders = results[0];
     managers = results[1];
     adjustments = results[3];
-    const rule = results[2];
+    const rule = results[2] as any;
 
     if (rule) {
       salaryRule = {
@@ -128,88 +129,108 @@ export default async function SalaryPage() {
         planThreshold: Number(rule.plan_threshold),
         planBonus: Number(rule.plan_bonus),
       };
-    }
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Ошибка загрузки данных";
-  }
+      
+      // Получаем метод расчета и статусы "Выдано"
+      const calcMethod = rule.calc_method || "all";
+      const deliveredStatuses = rule.delivered_statuses || [];
 
-  if (!salaryRule) {
-    salaryRule = {
-      baseSalary: 30000,
-      revenuePercent: 1,
-      marginPercent: 20,
-      paidRevenuePercent: 2,
-      planThreshold: 500000,
-      planBonus: 5000,
-    };
-  }
+      const managerData = new Map<string, { ordersCount: number; revenue: number; margin: number; paidRevenue: number }>();
 
-  const managerData = new Map<string, { ordersCount: number; revenue: number; margin: number; paidRevenue: number }>();
+      // Перебираем заказы с учетом метода расчета
+      for (const order of orders) {
+        const id = order.managerId || "0";
+        if (id === "0") continue;
 
-  for (const order of orders) {
-    const id = order.managerId || "0";
-    if (id === "0") continue;
+        // Если метод "По оплаченным" — пропускаем заказы с долгом
+        if (calcMethod === "paid" && Number(order.debt || 0) > 0) {
+          continue;
+        }
 
-    const sum = Number(order.sum || 0);
-    const orderMargin = calcOrderMargin(order.positions);
-    const paidSum = order.paid ? sum : 0;
+        let orderRevenue = 0;
+        let orderMargin = 0;
+        let hasValidPositions = false;
 
-    const existing = managerData.get(id);
-    if (existing) {
-      existing.ordersCount += 1;
-      existing.revenue += sum;
-      existing.margin += orderMargin;
-      existing.paidRevenue += paidSum;
-    } else {
-      managerData.set(id, {
-        ordersCount: 1,
-        revenue: sum,
-        margin: orderMargin,
-        paidRevenue: paidSum,
-      });
-    }
-  }
+        if (order.positions) {
+          for (const pos of order.positions) {
+            // Пропускаем отмененные
+            if (pos.isCanceled === "1" || pos.isCanceled === "2") continue;
 
-  const calculations: (SalaryCalculation & { adjustment: number; adjustmentReason: string; finalTotal: number })[] = [];
+            // Если метод "По выданным" — считаем только позиции с нужным статусом
+            if (calcMethod === "delivered" && !deliveredStatuses.includes(Number(pos.statusCode))) {
+              continue;
+            }
 
-  for (const [managerId, data] of managerData) {
-    const managerName = getManagerName(managerId, managers);
-    const calc = calculateSalary(
-      managerId,
-      managerName,
-      data.ordersCount,
-      data.revenue,
-      data.margin,
-      data.paidRevenue,
-      salaryRule
-    );
-    
-    const adjData = adjustments[managerId] || { amount: 0, reason: "" };
-    const finalTotal = calc.total + adjData.amount;
+            const qty = Number(pos.quantityFinal || pos.quantity || 0);
+            const priceIn = Number(pos.priceIn || 0);
+            const priceOut = Number(pos.priceOut || 0);
+            
+            orderRevenue += priceOut * qty;
+            orderMargin += (priceOut - priceIn) * qty;
+            hasValidPositions = true;
+          }
+        }
 
-    calculations.push({ ...calc, adjustment: adjData.amount, adjustmentReason: adjData.reason, finalTotal });
-  }
+        // Если метод "По всем" — берем сумму заказа целиком (если нет позиций)
+        if (calcMethod === "all" && !hasValidPositions) {
+          orderRevenue = Number(order.sum || 0);
+          // Маржу для "all" считаем через функцию (если позиции есть, они уже посчитались выше)
+          if (order.positions && order.positions.length > 0) {
+             orderMargin = calcOrderMargin(order.positions);
+          }
+        }
 
-  calculations.sort((a, b) => b.finalTotal - a.finalTotal);
+        const paidSum = order.paid ? orderRevenue : 0;
 
-  const totalFot = calculations.reduce((sum, c) => sum + c.finalTotal, 0);
-  const totalRevenue = calculations.reduce((sum, c) => sum + c.revenue, 0);
-  const totalMargin = calculations.reduce((sum, c) => sum + c.margin, 0);
+        const existing = managerData.get(id);
+        if (existing) {
+          existing.ordersCount += 1;
+          existing.revenue += orderRevenue;
+          existing.margin += orderMargin;
+          existing.paidRevenue += paidSum;
+        } else {
+          managerData.set(id, {
+            ordersCount: 1,
+            revenue: orderRevenue,
+            margin: orderMargin,
+            paidRevenue: paidSum,
+          });
+        }
+      }
 
-  return (
-    <AppLayout>
-      <div className="mx-auto max-w-7xl">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Расчёт зарплаты</h1>
-          <p className="mt-1 text-sm text-slate-500">Период: {monthName}</p>
-        </div>
+      const calculations: (SalaryCalculation & { adjustment: number; adjustmentReason: string; finalTotal: number })[] = [];
 
-        {error ? (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-            Ошибка: {error}
-          </div>
-        ) : (
-          <>
+      for (const [managerId, data] of managerData) {
+        const managerName = getManagerName(managerId, managers);
+        const calc = calculateSalary(
+          managerId,
+          managerName,
+          data.ordersCount,
+          data.revenue,
+          data.margin,
+          data.paidRevenue,
+          salaryRule
+        );
+        
+        const adjData = adjustments[managerId] || { amount: 0, reason: "" };
+        const finalTotal = calc.total + adjData.amount;
+
+        calculations.push({ ...calc, adjustment: adjData.amount, adjustmentReason: adjData.reason, finalTotal });
+      }
+
+      calculations.sort((a, b) => b.finalTotal - a.finalTotal);
+
+      const totalFot = calculations.reduce((sum, c) => sum + c.finalTotal, 0);
+      const totalRevenue = calculations.reduce((sum, c) => sum + c.revenue, 0);
+      const totalMargin = calculations.reduce((sum, c) => sum + c.margin, 0);
+
+      return (
+        <AppLayout>
+          <div className="mx-auto max-w-7xl">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Расчёт зарплаты</h1>
+              <p className="mt-1 text-sm text-slate-500">Период: {monthName}</p>
+            </div>
+
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="text-sm text-slate-500">ФОТ (Итог к выдаче)</div>
@@ -336,7 +357,28 @@ export default async function SalaryPage() {
                 </div>
               )}
             </div>
-          </>
+          </div>
+        </AppLayout>
+      );
+    } else {
+      error = "Правила расчета зарплаты не найдены. Настройте их в разделе Сервис -> Правила ЗП.";
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Ошибка загрузки данных";
+  }
+
+  // Если нет правил или произошла ошибка
+  return (
+    <AppLayout>
+      <div className="mx-auto max-w-7xl">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Расчёт зарплаты</h1>
+          <p className="mt-1 text-sm text-slate-500">Период: {monthName}</p>
+        </div>
+        {error && (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            Ошибка: {error}
+          </div>
         )}
       </div>
     </AppLayout>

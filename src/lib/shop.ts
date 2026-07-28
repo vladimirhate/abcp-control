@@ -23,6 +23,8 @@ export type SalaryRule = {
   plan_threshold: number;
   plan_bonus: number;
   is_default: boolean;
+  calc_method: string;
+  delivered_statuses: number[];
 };
 
 export type AlertsSettings = {
