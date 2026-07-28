@@ -70,7 +70,6 @@ async function getChecks(period: string, from?: string, to?: string): Promise<Re
   
   const { dateStart, dateEnd } = getRange(period, from, to);
   
-  // Форматируем даты для Komtet (только YYYY-MM-DD)
   const dStart = dateStart.toISOString().split("T")[0];
   const dEnd = dateEnd.toISOString().split("T")[0];
 
@@ -166,6 +165,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   let stuckMoney = 0;
   const typeMap = new Map<string, number>();
   const chartMap = new Map<string, { amount: number; time: number }>();
+  const stuckPayments: Payment[] = [];
 
   for (const p of payments) {
     const amount = Number(p.amount || 0);
@@ -193,6 +193,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
     const rest = Number(p.rest || 0);
     if (rest > 0) {
       stuckMoney += rest;
+      stuckPayments.push(p);
     }
   }
 
@@ -244,11 +245,48 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
               <RevenueChart data={chartData} />
             </div>
 
+            {/* Блок зависших денег */}
             <div className="mt-6 rounded-xl border border-red-200 bg-white shadow-sm">
               <div className="border-b border-red-200 bg-red-50 px-6 py-4">
                 <h2 className="font-semibold text-red-800">Зависшие деньги (Аномалии): {Math.round(stuckMoney).toLocaleString("ru-RU")} ₽</h2>
                 <p className="text-xs text-red-700 mt-1">Оплаты внесены в систему, но не полностью привязаны к заказам (остаток на счете клиента).</p>
               </div>
+              {stuckPayments.length === 0 ? (
+                <div className="p-6 text-center text-slate-500">Все оплаты корректно привязаны к заказам!</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-slate-500">
+                        <th className="px-4 py-3 font-medium">№ Платежа</th>
+                        <th className="px-4 py-3 font-medium">Дата</th>
+                        <th className="px-4 py-3 font-medium">Клиент</th>
+                        <th className="px-4 py-3 font-medium">Сумма оплаты</th>
+                        <th className="px-4 py-3 font-medium">Зависший остаток</th>
+                        <th className="px-4 py-3 font-medium">Тип</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stuckPayments.slice(0, 50).map((p) => (
+                        <tr key={p.paymentId} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-blue-600">{p.paymentNumber || "—"}</td>
+                          <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{p.createDateTime}</td>
+                          <td className="px-4 py-3 text-slate-700 max-w-xs truncate">
+                            {usersMap[p.userId] || "ID: " + p.userId}
+                          </td>
+                          <td className="px-4 py-3 text-slate-900 font-medium">
+                            {Math.round(Number(p.amount || 0)).toLocaleString("ru-RU")} ₽
+                          </td>
+                          <td className="px-4 py-3 text-red-600 font-medium">
+                            {Math.round(Number(p.rest || 0)).toLocaleString("ru-RU")} ₽
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 text-xs">{p.paymentType || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Полный список оплат */}
@@ -281,7 +319,6 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                         const clientName = usersMap[p.userId] || "Клиент " + p.userId;
                         const linkedOrders = linksMap[p.paymentNumber] || [];
                         
-                        // Анализ чеков
                         const checks = checksMap[p.paymentId] || [];
                         let hasAdvance = false;
                         let hasFull = false;
