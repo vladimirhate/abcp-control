@@ -54,10 +54,10 @@ async function getManagers(): Promise<Manager[]> {
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден в БД");
 
-  // withDeleted: "1" - запрашиваем всех, включая удаленных
+  // Запрашиваем только активных менеджеров
   return abcpRequest<Manager[]>(
     "cp/managers",
-    { withDeleted: "1" },
+    {},
     {
       api_url: shop.api_url,
       api_login: shop.api_login,
