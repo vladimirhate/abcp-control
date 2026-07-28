@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { abcpRequest, formatDate } from "@/lib/abcp";
 import { getShop } from "@/lib/shop";
+import { fetchStatusHistory } from "@/lib/history";
 import { AppLayout } from "@/components/AppLayout";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { getRange } from "@/lib/dates";
 
 type OrderPosition = {
   id: string;
-  statusChangeDate: string;
 };
 
 type Order = {
@@ -74,7 +74,7 @@ type PageProps = {
 
 export default async function ManagersPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const period = params?.period || "this_month"; // По умолчанию этот месяц
+  const period = params?.period || "this_month";
   const from = params?.from;
   const to = params?.to;
 
@@ -90,55 +90,75 @@ export default async function ManagersPage({ searchParams }: PageProps) {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
   }
 
-  const managerStats = new Map<string, { totalReactionHours: number; ordersCount: number }>();
+  // Получаем ID всех позиций всех заказов
+  const allPositionIds = orders.flatMap(o => o.positions?.map(p => p.id) || []);
   
+  // Запрашиваем историю статусов
+  const history = error ? {} : await fetchStatusHistory(allPositionIds);
+
+  // Статистика по менеджерам (ключ - ID менеджера)
+  const managerStats = new Map<string, { 
+    totalReactionHours: number; 
+    ordersCount: number; 
+    isOther: boolean;
+  }>();
+
   let debugTotalOrders = 0;
   let debugProcessedOrders = 0;
-  let debugNoPositions = 0;
-  let debugNoDate = 0;
+  let debugNoHistory = 0;
 
   for (const order of orders) {
     debugTotalOrders++;
-    if (!order.positions || order.positions.length === 0) {
-      debugNoPositions++;
-      continue;
-    }
+    if (!order.positions || order.positions.length === 0) continue;
 
     let earliestStatusChange: Date | null = null;
+    let reactingManagerId: string | null = null;
 
+    // Ищем самую первую смену статуса среди всех позиций заказа
     for (const pos of order.positions) {
-      if (pos.statusChangeDate) {
-        const changeDate = new Date(pos.statusChangeDate.replace(" ", "T"));
-        if (!isNaN(changeDate.getTime())) {
-          if (!earliestStatusChange || changeDate < earliestStatusChange) {
-            earliestStatusChange = changeDate;
+      const posHistory = history[pos.id];
+      if (posHistory && posHistory.length > 0) {
+        const sortedHist = [...posHistory].sort((a, b) => a.datetime.localeCompare(b.datetime));
+        const firstChange = new Date(sortedHist[0].datetime.replace(" ", "T"));
+        
+        if (!isNaN(firstChange.getTime())) {
+          if (!earliestStatusChange || firstChange < earliestStatusChange) {
+            earliestStatusChange = firstChange;
+            // Берем ID менеджера из записи истории!
+            reactingManagerId = sortedHist[0].managerId;
           }
         }
       }
     }
 
-    if (earliestStatusChange) {
+    if (earliestStatusChange && reactingManagerId) {
       const orderDate = new Date(order.date.replace(" ", "T"));
       
       if (!isNaN(orderDate.getTime())) {
         const diffMs = earliestStatusChange.getTime() - orderDate.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
 
-        // Учитываем только если время больше 0 (статус менялся после создания)
         if (diffHours > 0 && diffHours < 168) {
           debugProcessedOrders++;
-          const managerId = order.managerId || "0";
-          const existing = managerStats.get(managerId);
+          
+          // Проверяем, является ли автор изменения менеджером по заказу
+          const isOther = reactingManagerId !== order.managerId;
+          
+          const existing = managerStats.get(reactingManagerId);
           if (existing) {
             existing.totalReactionHours += diffHours;
             existing.ordersCount += 1;
           } else {
-            managerStats.set(managerId, { totalReactionHours: diffHours, ordersCount: 1 });
+            managerStats.set(reactingManagerId, { 
+              totalReactionHours: diffHours, 
+              ordersCount: 1,
+              isOther
+            });
           }
-        } else if (diffHours === 0) {
-          debugNoDate++; // Статус менялся мгновенно (в момент создания)
         }
       }
+    } else {
+      debugNoHistory++;
     }
   }
 
@@ -147,6 +167,7 @@ export default async function ManagersPage({ searchParams }: PageProps) {
     name: getManagerName(id, managers),
     ordersCount: data.ordersCount,
     avgReactionHours: data.ordersCount > 0 ? data.totalReactionHours / data.ordersCount : 0,
+    isOther: data.isOther
   }));
 
   stats.sort((a, b) => a.avgReactionHours - b.avgReactionHours);
@@ -164,9 +185,8 @@ export default async function ManagersPage({ searchParams }: PageProps) {
 
         {/* Блок отладки */}
         <div className="mt-4 rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
-          Всего заказов загружено: {debugTotalOrders} | 
-          Нет позиций: {debugNoPositions} | 
-          Статус совпадает с созданием (0 мин): {debugNoDate} | 
+          Всего заказов: {debugTotalOrders} | 
+          Нет истории статусов: {debugNoHistory} | 
           Успешно посчитано: {debugProcessedOrders}
         </div>
 
@@ -176,7 +196,7 @@ export default async function ManagersPage({ searchParams }: PageProps) {
           <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-6 py-4">
               <h2 className="font-semibold text-slate-900">Рейтинг скорости реакции</h2>
-              <p className="text-xs text-slate-500 mt-1">Время от создания заказа до первой смены статуса позиции</p>
+              <p className="text-xs text-slate-500 mt-1">Время от создания заказа до первой смены статуса (по автору изменения)</p>
             </div>
             {stats.length === 0 ? (
               <div className="p-6 text-center text-slate-500">Нет данных о реакции менеджеров за этот период.</div>
@@ -194,7 +214,14 @@ export default async function ManagersPage({ searchParams }: PageProps) {
                     {stats.map((s) => (
                       <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-4 py-3 font-medium text-slate-900">
-                          <Link href={"/manager/" + s.id} className="hover:text-blue-600">{s.name}</Link>
+                          <Link href={"/manager/" + s.id} className="hover:text-blue-600">
+                            {s.name}
+                          </Link>
+                          {s.isOther && (
+                            <span className="ml-2 inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                              Другой менеджер
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-700">{s.ordersCount}</td>
                         <td className="px-4 py-3">
