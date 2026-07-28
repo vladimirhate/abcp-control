@@ -47,12 +47,12 @@ export default async function GaragePage() {
       })
     ]);
 
-    // Проверяем, что гараж — это массив
+        // Проверяем, что гараж — это массив
     if (Array.isArray(carsData)) {
       cars = carsData as Car[];
     } else {
-      // Если API вернул ошибку
-      throw new Error(carsData?.errorMessage || "Не удалось загрузить список автомобилей из гаража");
+      // Если API вернул ошибку или другой формат
+      throw new Error("Сырой ответ API: " + JSON.stringify(carsData).slice(0, 500));
     }
 
     // Собираем карту клиентов
