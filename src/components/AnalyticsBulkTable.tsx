@@ -122,7 +122,7 @@ export function AnalyticsBulkTable({
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate">{c.name}</td>
                   <td className="px-4 py-3 text-slate-900">{Math.round(c.totalSum || 0).toLocaleString("ru-RU")} ₽</td>
-                  <td className="px-4 py-3 text-red-600 text-xs">{c.lastOrderDate?.toLocaleDateString("ru-RU")}</td>
+                  <td className="px-4 py-3 text-red-600 text-xs">{c.lastOrderDate}</td>
                   <td className="px-4 py-3 text-slate-700">{(c.cancelRate || 0).toFixed(1)}%</td>
                 </tr>
               ))}
