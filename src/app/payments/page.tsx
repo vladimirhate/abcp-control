@@ -23,6 +23,14 @@ type User = {
   organizationName: string;
 };
 
+type Check = {
+  id: string;
+  paymentId: string;
+  calculationMethod: number; // 0 - Предоплата 100%, 1 - Предоплата, 2 - Полный расчет
+  fiscalization: number; // 0 - Нет, 1 - Да
+  paymentAmount: number;
+};
+
 async function getPayments(period: string, from?: string, to?: string): Promise<Payment[]> {
   const { dateStart, dateEnd } = getRange(period, from, to);
   const shop = await getShop();
@@ -56,12 +64,45 @@ async function getUsersMap(): Promise<Record<string, string>> {
   return map;
 }
 
+async function getChecks(period: string, from?: string, to?: string): Promise<Record<string, Check[]>> {
+  const shop = await getShop();
+  if (!shop) return {};
+  
+  const { dateStart, dateEnd } = getRange(period, from, to);
+  
+  // Форматируем даты для Komtet (только YYYY-MM-DD)
+  const dStart = dateStart.toISOString().split("T")[0];
+  const dEnd = dateEnd.toISOString().split("T")[0];
+
+  try {
+    const data = await abcpRequest<Check[]>("komtet/getChecks", {
+      dateCreatedStart: dStart,
+      dateCreatedEnd: dEnd,
+    }, {
+      api_url: shop.api_url, api_login: shop.api_login, api_password_md5: shop.api_password_md5,
+    });
+
+    const map: Record<string, Check[]> = {};
+    if (Array.isArray(data)) {
+      data.forEach(c => {
+        if (c.paymentId) {
+          if (!map[c.paymentId]) map[c.paymentId] = [];
+          map[c.paymentId].push(c);
+        }
+      });
+    }
+    return map;
+  } catch (e) {
+    return {};
+  }
+}
+
 async function getPaymentLinks(paymentNumbers: string[]): Promise<Record<string, string[]>> {
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден");
   
   const linksMap: Record<string, string[]> = {};
-  const chunkSize = 50; // Чтобы не превышать лимит длины URL
+  const chunkSize = 50;
   
   for (let i = 0; i < paymentNumbers.length; i += chunkSize) {
     const chunk = paymentNumbers.slice(i, i + chunkSize);
@@ -84,7 +125,7 @@ async function getPaymentLinks(paymentNumbers: string[]): Promise<Record<string,
         });
       }
     } catch (e) {
-      // Игнорируем ошибки чанков, чтобы не ронять страницу
+      // Игнорируем ошибки чанков
     }
   }
   return linksMap;
@@ -103,6 +144,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   let payments: Payment[] = [];
   let usersMap: Record<string, string> = {};
   let linksMap: Record<string, string[]> = {};
+  let checksMap: Record<string, Check[]> = {};
   let error: string | null = null;
 
   try {
@@ -110,11 +152,12 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
     payments = pmts;
     usersMap = users;
 
-    // Получаем привязки к заказам для всех платежей
     const allPaymentNumbers = payments.map(p => p.paymentNumber).filter(Boolean);
     if (allPaymentNumbers.length > 0) {
       linksMap = await getPaymentLinks(allPaymentNumbers);
     }
+    
+    checksMap = await getChecks(period, from, to);
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
   }
@@ -128,12 +171,9 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
     const amount = Number(p.amount || 0);
     if (amount > 0) {
       totalIncome += amount;
-
-      // Группировка по типам оплат (динамически)
       const typeName = p.paymentType || "Неизвестно";
       typeMap.set(typeName, (typeMap.get(typeName) || 0) + amount);
 
-      // Группировка для графика
       const dateStr = p.createDateTime.split(" ")[0];
       const date = new Date(dateStr);
       if (!isNaN(date.getTime())) {
@@ -189,7 +229,6 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                 </div>
               </div>
               
-              {/* Динамические карточки типов оплат */}
               {Array.from(typeMap.entries()).slice(0, 3).map(([typeName, sum]) => (
                 <div key={typeName} className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
                   <div className="text-sm text-blue-700">{typeName}</div>
@@ -216,7 +255,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
             <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-6 py-4">
                 <h2 className="font-semibold text-slate-900">История оплат ({payments.length})</h2>
-                <p className="text-xs text-slate-500 mt-1">Подробная информация о каждом платеже, клиенте, заказе и чеке</p>
+                <p className="text-xs text-slate-500 mt-1">Подробная информация о каждом платеже, клиенте, заказе и статусе чека</p>
               </div>
               {payments.length === 0 ? (
                 <div className="p-6 text-center text-slate-500">Нет оплат за этот период.</div>
@@ -230,7 +269,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                         <th className="px-4 py-3 font-medium">Клиент</th>
                         <th className="px-4 py-3 font-medium">Сумма</th>
                         <th className="px-4 py-3 font-medium">Тип</th>
-                        <th className="px-4 py-3 font-medium">Чек</th>
+                        <th className="px-4 py-3 font-medium">Статус чека</th>
                         <th className="px-4 py-3 font-medium">Привязка к заказу</th>
                         <th className="px-4 py-3 font-medium">Остаток</th>
                       </tr>
@@ -241,7 +280,27 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                         const rest = Number(p.rest || 0);
                         const clientName = usersMap[p.userId] || "Клиент " + p.userId;
                         const linkedOrders = linksMap[p.paymentNumber] || [];
-                        const hasCheck = Number(p.komtetCheckId || 0) > 0;
+                        
+                        // Анализ чеков
+                        const checks = checksMap[p.paymentId] || [];
+                        let hasAdvance = false;
+                        let hasFull = false;
+                        let isFiscalized = false;
+
+                        checks.forEach(c => {
+                          if (c.calculationMethod === 0 || c.calculationMethod === 1 || c.calculationMethod === 3) hasAdvance = true;
+                          if (c.calculationMethod === 2) hasFull = true;
+                          if (c.fiscalization === 1) isFiscalized = true;
+                        });
+
+                        let checkStatus = <span className="text-red-600 font-medium">Нет чека</span>;
+                        if (hasAdvance && !hasFull) {
+                          checkStatus = <span className="text-amber-600 font-medium">Только аванс{!isFiscalized ? " (не фиск.)" : ""}</span>;
+                        } else if (hasFull) {
+                          checkStatus = <span className="text-green-700 font-medium">Закрывающий{!isFiscalized ? " (не фиск.)" : ""}</span>;
+                        } else if (hasAdvance && hasFull) {
+                           checkStatus = <span className="text-green-700 font-medium">Полный{!isFiscalized ? " (не фиск.)" : ""}</span>;
+                        }
 
                         return (
                           <tr key={p.paymentId} className="border-b border-slate-100 hover:bg-slate-50">
@@ -252,12 +311,8 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                               {Math.round(amount).toLocaleString("ru-RU")} ₽
                             </td>
                             <td className="px-4 py-3 text-slate-700 text-xs">{p.paymentType || "—"}</td>
-                            <td className="px-4 py-3">
-                              {hasCheck ? (
-                                <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Да</span>
-                              ) : (
-                                <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">Нет</span>
-                              )}
+                            <td className="px-4 py-3 text-xs">
+                              {checkStatus}
                             </td>
                             <td className="px-4 py-3 text-slate-700 text-xs">
                               {linkedOrders.length > 0 ? linkedOrders.join(", ") : "—"}
