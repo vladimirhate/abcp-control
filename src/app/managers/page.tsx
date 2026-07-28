@@ -1,26 +1,57 @@
 import Link from "next/link";
 import { abcpRequest, formatDate } from "@/lib/abcp";
 import { getShop } from "@/lib/shop";
-import { fetchStatusHistory } from "@/lib/history";
 import { AppLayout } from "@/components/AppLayout";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { getRange } from "@/lib/dates";
 
-type OrderPosition = { id: string };
-type Order = { number: string; date: string; managerId: string; positions?: OrderPosition[] };
-type Manager = { id: string; firstName: string; lastName: string; email: string };
+type OrderPosition = {
+  id: string;
+  statusChangeDate: string;
+};
+
+type Order = {
+  number: string;
+  date: string;
+  managerId: string;
+  positions?: OrderPosition[];
+};
+
+type Manager = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
 
 async function getOrders(period: string, from?: string, to?: string): Promise<Order[]> {
   const { dateStart, dateEnd } = getRange(period, from, to);
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден в БД");
-  return abcpRequest<Order[]>("cp/orders", { dateCreatedStart: formatDate(dateStart), dateCreatedEnd: formatDate(dateEnd), limit: "1000" }, { api_url: shop.api_url, api_login: shop.api_login, api_password_md5: shop.api_password_md5 });
+
+  return abcpRequest<Order[]>(
+    "cp/orders",
+    {
+      dateCreatedStart: formatDate(dateStart),
+      dateCreatedEnd: formatDate(dateEnd),
+      limit: "1000",
+    },
+    {
+      api_url: shop.api_url,
+      api_login: shop.api_login,
+      api_password_md5: shop.api_password_md5,
+    }
+  );
 }
 
 async function getManagers(): Promise<Manager[]> {
   const shop = await getShop();
   if (!shop) throw new Error("Магазин не найден в БД");
-  return abcpRequest<Manager[]>("cp/managers", {}, { api_url: shop.api_url, api_login: shop.api_login, api_password_md5: shop.api_password_md5 });
+  return abcpRequest<Manager[]>("cp/managers", {}, {
+    api_url: shop.api_url,
+    api_login: shop.api_login,
+    api_password_md5: shop.api_password_md5,
+  });
 }
 
 function getManagerName(managerId: string, managers: Manager[]): string {
@@ -37,11 +68,13 @@ function formatHours(hours: number): string {
   return (hours / 24).toFixed(1) + " дн";
 }
 
-type PageProps = { searchParams: Promise<{ period?: string; from?: string; to?: string }> };
+type PageProps = {
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+};
 
 export default async function ManagersPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const period = params?.period || "last7";
+  const period = params?.period || "this_month"; // По умолчанию этот месяц
   const from = params?.from;
   const to = params?.to;
 
@@ -57,23 +90,28 @@ export default async function ManagersPage({ searchParams }: PageProps) {
     error = e instanceof Error ? e.message : "Ошибка загрузки данных";
   }
 
-  const allPositionIds = orders.flatMap(o => o.positions?.map(p => p.id) || []);
-  const history = error ? {} : await fetchStatusHistory(allPositionIds);
-
   const managerStats = new Map<string, { totalReactionHours: number; ordersCount: number }>();
+  
+  let debugTotalOrders = 0;
+  let debugProcessedOrders = 0;
+  let debugNoPositions = 0;
+  let debugNoDate = 0;
 
   for (const order of orders) {
-    if (!order.positions || order.positions.length === 0) continue;
+    debugTotalOrders++;
+    if (!order.positions || order.positions.length === 0) {
+      debugNoPositions++;
+      continue;
+    }
+
     let earliestStatusChange: Date | null = null;
 
     for (const pos of order.positions) {
-      const posHistory = history[pos.id];
-      if (posHistory && posHistory.length > 0) {
-        const sortedHist = [...posHistory].sort((a, b) => a.datetime.localeCompare(b.datetime));
-        const firstChange = new Date(sortedHist[0].datetime.replace(" ", "T"));
-        if (!isNaN(firstChange.getTime())) {
-          if (!earliestStatusChange || firstChange < earliestStatusChange) {
-            earliestStatusChange = firstChange;
+      if (pos.statusChangeDate) {
+        const changeDate = new Date(pos.statusChangeDate.replace(" ", "T"));
+        if (!isNaN(changeDate.getTime())) {
+          if (!earliestStatusChange || changeDate < earliestStatusChange) {
+            earliestStatusChange = changeDate;
           }
         }
       }
@@ -81,10 +119,14 @@ export default async function ManagersPage({ searchParams }: PageProps) {
 
     if (earliestStatusChange) {
       const orderDate = new Date(order.date.replace(" ", "T"));
+      
       if (!isNaN(orderDate.getTime())) {
         const diffMs = earliestStatusChange.getTime() - orderDate.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
-        if (diffHours >= 0 && diffHours < 168) {
+
+        // Учитываем только если время больше 0 (статус менялся после создания)
+        if (diffHours > 0 && diffHours < 168) {
+          debugProcessedOrders++;
           const managerId = order.managerId || "0";
           const existing = managerStats.get(managerId);
           if (existing) {
@@ -93,6 +135,8 @@ export default async function ManagersPage({ searchParams }: PageProps) {
           } else {
             managerStats.set(managerId, { totalReactionHours: diffHours, ordersCount: 1 });
           }
+        } else if (diffHours === 0) {
+          debugNoDate++; // Статус менялся мгновенно (в момент создания)
         }
       }
     }
@@ -118,13 +162,21 @@ export default async function ManagersPage({ searchParams }: PageProps) {
           <PeriodFilter currentPeriod={period} currentFrom={from} currentTo={to} />
         </div>
 
+        {/* Блок отладки */}
+        <div className="mt-4 rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
+          Всего заказов загружено: {debugTotalOrders} | 
+          Нет позиций: {debugNoPositions} | 
+          Статус совпадает с созданием (0 мин): {debugNoDate} | 
+          Успешно посчитано: {debugProcessedOrders}
+        </div>
+
         {error ? (
           <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">Ошибка: {error}</div>
         ) : (
           <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-6 py-4">
               <h2 className="font-semibold text-slate-900">Рейтинг скорости реакции</h2>
-              <p className="text-xs text-slate-500 mt-1">Время от создания заказа до первой смены статуса</p>
+              <p className="text-xs text-slate-500 mt-1">Время от создания заказа до первой смены статуса позиции</p>
             </div>
             {stats.length === 0 ? (
               <div className="p-6 text-center text-slate-500">Нет данных о реакции менеджеров за этот период.</div>
