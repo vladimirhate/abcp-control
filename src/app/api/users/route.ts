@@ -12,8 +12,17 @@ export async function GET(request: NextRequest) {
     const profileId = searchParams.get("profileId");
     const state = searchParams.get("state");
     const business = searchParams.get("business");
+    
+    // Пагинация
+    const page = Number(searchParams.get("page") || "0");
+    const limit = 100; // Загружаем по 100 за раз
+    const skip = page * limit;
 
-    const params: Record<string, string> = { limit: "500" }; // Загружаем по 500 за раз
+    const params: Record<string, string> = { 
+      limit: String(limit),
+      skip: String(skip) 
+    };
+    
     if (profileId) params.profileId = profileId;
     if (state) params.state = state;
     
@@ -36,7 +45,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data, hasMore: data.length === limit });
   } catch (e: any) {
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });
   }

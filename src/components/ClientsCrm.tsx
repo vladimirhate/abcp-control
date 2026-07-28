@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Loader2, CheckSquare, Square } from "lucide-react";
+import { Search, Loader2, CheckSquare, Square, ChevronLeft, ChevronRight } from "lucide-react";
 
 type Client = {
   userId: string;
@@ -32,6 +32,8 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   
   const [search, setSearch] = useState("");
   const [filterProfile, setFilterProfile] = useState("");
@@ -49,19 +51,25 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
     if (filterProfile) params.append("profileId", filterProfile);
     if (filterState) params.append("state", filterState);
     if (filterBusiness) params.append("business", filterBusiness);
+    params.append("page", String(page));
     
     const res = await fetch(`/api/abcp/users?${params.toString()}`);
     const data = await res.json();
     if (data.success) {
       setClients(data.data);
+      setHasMore(data.hasMore);
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    const delay = setTimeout(fetchClients, 500); // Дебаунс поиска
-    return () => clearTimeout(delay);
+    setPage(0); // Сброс страницы при смене фильтров
+    fetchClients();
   }, [search, filterProfile, filterState, filterBusiness]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [page]);
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -207,6 +215,27 @@ export function ClientsCrm({ profiles }: { profiles: Profile[] }) {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Пагинация */}
+      <div className="flex items-center justify-between border-t border-slate-200 p-4">
+        <span className="text-xs text-slate-500">Страница {page + 1}</span>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setPage(p => Math.max(0, p - 1))} 
+            disabled={page === 0 || loading}
+            className="flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <ChevronLeft size={14} /> Назад
+          </button>
+          <button 
+            onClick={() => setPage(p => p + 1)} 
+            disabled={!hasMore || loading}
+            className="flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Вперед <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
     </div>
   );

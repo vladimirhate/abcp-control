@@ -94,7 +94,7 @@ type PageProps = {
 
 export default async function ClientsAnalyticsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const period = params?.period || "this_month";
+  const period = params?.period || "last6months";
   const from = params?.from;
   const to = params?.to;
 
