@@ -31,14 +31,12 @@ function getManagerName(managerId: string, managers: Manager[]): string {
   return fullName || manager.email || "ID: " + managerId;
 }
 
-// Функция для парсинга даты формата DD.MM.YYYY HH:mm:ss
 function parseAbcpDate(dateStr: string): Date | null {
   if (!dateStr) return null;
   const parts = dateStr.split(" ");
   const dateParts = parts[0].split(".");
   const timeParts = parts[1] ? parts[1].split(":") : ["0", "0", "0"];
   
-  // new Date(YYYY, MM-1, DD, HH, mm, ss)
   const date = new Date(
     Number(dateParts[2]),
     Number(dateParts[1]) - 1,
@@ -68,6 +66,7 @@ export default async function ManagersPage({ searchParams }: PageProps) {
   let orders: Order[] = [];
   let managers: Manager[] = [];
   let error: string | null = null;
+  let debugTarget: any = null;
 
   try {
     const results = await Promise.all([getOrders(period, from, to), getManagers()]);
@@ -90,32 +89,55 @@ export default async function ManagersPage({ searchParams }: PageProps) {
 
     for (const pos of order.positions) {
       const posHistory = history[pos.id];
+      
+      // Специальная отладка для позиции 782113764
+      if (pos.id === "782113764") {
+        debugTarget = {
+          orderId: order.number,
+          orderDate: order.date,
+          orderManagerId: order.managerId,
+          historyExists: !!posHistory,
+          historyData: posHistory
+        };
+      }
+
       if (posHistory && Array.isArray(posHistory) && posHistory.length > 0) {
-        // Сортируем историю по времени (используем правильный парсер)
         const sortedHist = [...posHistory].sort((a, b) => {
           const dateA = parseAbcpDate(a.datetime)?.getTime() || 0;
           const dateB = parseAbcpDate(b.datetime)?.getTime() || 0;
           return dateA - dateB;
         });
         
-        const firstChange = parseAbcpDate(sortedHist[0].datetime);
+        // Ищем ПЕРВУЮ запись, сделанную НЕ системой
+        const firstManagerAction = sortedHist.find(h => h.managerName && h.managerName.trim() !== "Система");
         
-        if (firstChange) {
-          if (!earliestStatusChange || firstChange < earliestStatusChange) {
-            earliestStatusChange = firstChange;
-            reactingManagerId = sortedHist[0].managerId;
+        if (firstManagerAction) {
+          const changeDate = parseAbcpDate(firstManagerAction.datetime);
+          if (changeDate) {
+            if (!earliestStatusChange || changeDate < earliestStatusChange) {
+              earliestStatusChange = changeDate;
+              reactingManagerId = firstManagerAction.managerId || "0"; // Если ID пустой, ставим 0
+            }
           }
         }
       }
     }
 
     if (earliestStatusChange && reactingManagerId) {
-      // Парсим дату создания заказа (формат YYYY-MM-DD HH:mm:ss)
       const orderDate = new Date(order.date.replace(" ", "T"));
       
       if (!isNaN(orderDate.getTime())) {
         const diffMs = earliestStatusChange.getTime() - orderDate.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
+
+        // Добавляем в отладку информацию о расчете времени
+        if (debugTarget && debugTarget.orderId === order.number) {
+          debugTarget.calculated = {
+            orderDateObj: orderDate.toISOString(),
+            changeDateObj: earliestStatusChange.toISOString(),
+            diffHours: diffHours
+          };
+        }
 
         if (diffHours > 0 && diffHours < 168) {
           const isOther = reactingManagerId !== order.managerId;
@@ -152,6 +174,25 @@ export default async function ManagersPage({ searchParams }: PageProps) {
           </div>
           <PeriodFilter currentPeriod={period} currentFrom={from} currentTo={to} />
         </div>
+
+        {/* Блок отладки для конкретного заказа */}
+        {debugTarget && (
+          <div className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 space-y-2 border border-amber-200">
+            <p className="font-bold">Отладка позиции 782113764:</p>
+            <p>Заказ: {debugTarget.orderId} | Создан: {debugTarget.orderDate} | Менеджер заказа: {debugTarget.orderManagerId}</p>
+            <p>История найдена: {debugTarget.historyExists ? "Да" : "НЕТ"}</p>
+            {debugTarget.historyExists && (
+              <pre className="mt-1 max-h-40 overflow-auto bg-white p-2 rounded border border-amber-300">
+                {JSON.stringify(debugTarget.historyData, null, 2)}
+              </pre>
+            )}
+            {debugTarget.calculated ? (
+              <p className="font-bold text-green-700">Расчет: diffHours = {debugTarget.calculated.diffHours.toFixed(2)}</p>
+            ) : (
+              <p className="font-bold text-red-700">Расчет не выполнен (earliestStatusChange или reactingManagerId равны null)</p>
+            )}
+          </div>
+        )}
 
         {error ? (
           <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">Ошибка: {error}</div>
